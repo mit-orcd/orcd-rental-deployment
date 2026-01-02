@@ -111,12 +111,26 @@ install_certbot() {
 }
 
 configure_firewall() {
-    log_info "Configuring firewall..."
+    log_info "Checking firewall configuration..."
     
-    systemctl enable --now firewalld
-    firewall-cmd --permanent --add-service=http
-    firewall-cmd --permanent --add-service=https
-    firewall-cmd --reload
+    # Amazon Linux 2023 on EC2 typically uses AWS Security Groups
+    # instead of firewalld. Only configure if firewalld is available.
+    if command -v firewall-cmd &> /dev/null; then
+        if systemctl is-active --quiet firewalld 2>/dev/null || systemctl start firewalld 2>/dev/null; then
+            log_info "Configuring firewalld..."
+            systemctl enable firewalld
+            firewall-cmd --permanent --add-service=http
+            firewall-cmd --permanent --add-service=https
+            firewall-cmd --reload
+        else
+            log_warn "firewalld is installed but couldn't be started"
+            log_warn "Ensure AWS Security Groups allow HTTP (80) and HTTPS (443)"
+        fi
+    else
+        log_warn "firewalld not installed (this is normal for Amazon Linux 2023 on EC2)"
+        log_warn "Firewall is managed via AWS Security Groups"
+        log_warn "Ensure your Security Group allows inbound traffic on ports 80 and 443"
+    fi
 }
 
 create_app_directory() {
