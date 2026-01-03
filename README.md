@@ -1,6 +1,8 @@
 # ORCD Rental Portal - Deployment Package
 
-This package contains everything needed to deploy the ORCD Rental Portal on AWS. The portal is built on [ColdFront](https://coldfront.io/) with the ORCD Direct Charge plugin and uses Globus OIDC for MIT authentication.
+This package contains everything needed to deploy the ORCD Rental Portal on AWS **Amazon Linux 2023**. The portal is built on [ColdFront](https://coldfront.io/) with the ORCD Direct Charge plugin and uses Globus OIDC for MIT authentication.
+
+> **Note**: This deployment is specifically tailored for **Amazon Linux 2023** on AWS EC2. See [Amazon Linux 2023 Considerations](#amazon-linux-2023-considerations) for platform-specific details.
 
 ## Overview
 
@@ -222,6 +224,80 @@ coldfront shell
 - **Email**: orcd-help@mit.edu
 - **ColdFront Docs**: https://coldfront.readthedocs.io/
 - **Globus Auth**: https://docs.globus.org/api/auth/
+
+## Amazon Linux 2023 Considerations
+
+This deployment package is tailored for **Amazon Linux 2023** (AL2023). Several configurations differ from other Linux distributions:
+
+### Package Management
+
+| Standard | Amazon Linux 2023 |
+|----------|-------------------|
+| `apt` / `yum` | `dnf` (AL2023 default) |
+| `python3-pip` | `python3.9-pip` |
+| `redis` | `redis6` (Amazon Extras) |
+
+### Firewall
+
+AL2023 does **not** include `firewalld` by default. Security is managed via **AWS Security Groups**:
+
+- The install script skips `firewalld` configuration
+- Configure inbound rules in the EC2 Security Group:
+  - SSH (22): Your IP only
+  - HTTP (80): Anywhere (redirects to HTTPS)
+  - HTTPS (443): Anywhere
+
+### Logging
+
+AL2023 uses **journald** by default instead of traditional log files:
+
+| Standard | Amazon Linux 2023 |
+|----------|-------------------|
+| `/var/log/secure` | `journalctl -u sshd` |
+| `/var/log/messages` | `journalctl` |
+
+The fail2ban sshd jail uses `backend = systemd` instead of `logpath = /var/log/secure`.
+
+### Python
+
+AL2023 ships with Python 3.9:
+
+```bash
+python3 --version  # Python 3.9.x
+```
+
+Virtual environments are created with:
+```bash
+python3 -m venv venv
+```
+
+### SELinux
+
+AL2023 has SELinux in **permissive** mode by default. If enabled in enforcing mode, you may need:
+
+```bash
+# Allow nginx to connect to unix socket
+sudo setsebool -P httpd_can_network_connect 1
+
+# Allow nginx to read static files
+sudo chcon -R -t httpd_sys_content_t /srv/coldfront/static/
+```
+
+### Service Names
+
+| Standard | Amazon Linux 2023 |
+|----------|-------------------|
+| `redis` | `redis6` |
+| `nginx` | `nginx` (same) |
+
+### Adapting to Other Distributions
+
+If deploying to Ubuntu, RHEL, or other distributions:
+
+1. **Ubuntu/Debian**: Change `dnf` to `apt`, adjust package names
+2. **RHEL 8/9**: Similar to AL2023, may need EPEL for some packages
+3. **Firewall**: Enable and configure `firewalld` or `ufw`
+4. **fail2ban**: Use `logpath = /var/log/auth.log` (Ubuntu) or `/var/log/secure` (RHEL)
 
 ## License
 
