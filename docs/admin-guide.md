@@ -134,6 +134,34 @@ sudo ln -s /opt/certbot/bin/certbot /usr/bin/certbot
 
 ### 3.4 Configure Firewall
 
+On Amazon Linux 2023 with AWS EC2, you have multiple firewall layers:
+
+| Layer | Purpose | Status |
+|-------|---------|--------|
+| **AWS Security Groups** | Port-level access control | Required |
+| **fail2ban + iptables** | Dynamic IP blocking | Installed by this package |
+| **firewalld** | Host-level firewall | Optional |
+
+**AWS Security Groups** (configured in step 2.2) are the primary firewall. The `fail2ban` tool uses `iptables` directly for dynamic blocking.
+
+**Note:** If you enable `firewalld`, you must change fail2ban to use `firewallcmd-rich-rules` instead of `iptables-multiport` in the jail configs to avoid conflicts.
+
+#### Option A: Security Groups + iptables only (Recommended)
+
+This is the default configuration. No additional firewall setup needed - AWS Security Groups handle port access, and fail2ban uses iptables for dynamic blocking.
+
+```bash
+# Verify iptables is available
+sudo iptables -L -n
+
+# Verify fail2ban chains exist
+sudo iptables -L -n | grep f2b
+```
+
+#### Option B: Enable firewalld (Defense in Depth)
+
+If you prefer an additional host firewall layer:
+
 ```bash
 # Enable firewalld
 sudo systemctl enable --now firewalld
@@ -145,6 +173,14 @@ sudo firewall-cmd --reload
 
 # Verify
 sudo firewall-cmd --list-all
+
+# IMPORTANT: Update fail2ban to use firewalld
+# Edit all files in /etc/fail2ban/jail.d/*.local
+# Change: banaction = iptables-multiport
+# To:     banaction = firewallcmd-rich-rules
+
+# Restart fail2ban
+sudo systemctl restart fail2ban
 ```
 
 ---
