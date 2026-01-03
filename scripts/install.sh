@@ -180,6 +180,10 @@ copy_config_files() {
     cp "${CONFIG_DIR}/wsgi.py" "${APP_DIR}/"
     chown ec2-user:ec2-user "${APP_DIR}/wsgi.py"
     
+    # Copy custom URLs (adds OIDC routes)
+    cp "${CONFIG_DIR}/urls.py" "${APP_DIR}/"
+    chown ec2-user:ec2-user "${APP_DIR}/urls.py"
+    
     # Copy systemd service
     cp "${CONFIG_DIR}/systemd/coldfront.service" /etc/systemd/system/
     

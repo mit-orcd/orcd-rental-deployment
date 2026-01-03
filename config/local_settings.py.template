@@ -15,6 +15,29 @@ from coldfront.config.settings import *
 import os
 
 # =============================================================================
+# INSTALLED APPS - Add OIDC and ORCD Plugin
+# =============================================================================
+
+# Add mozilla_django_oidc for Globus authentication
+INSTALLED_APPS = list(INSTALLED_APPS) + [
+    'mozilla_django_oidc',
+    'coldfront_orcd_direct_charge',
+]
+
+# =============================================================================
+# URL CONFIGURATION - Use custom URLs with OIDC
+# =============================================================================
+
+# Use our custom urls.py that adds OIDC URLs to ColdFront's patterns
+# The custom urls.py file should be at /srv/coldfront/urls.py
+ROOT_URLCONF = 'urls'
+
+# OIDC URLs provided:
+#   /oidc/authenticate/ - Initiates OIDC login flow  
+#   /oidc/callback/     - Handles callback from Globus Auth
+#   /oidc/logout/       - OIDC logout
+
+# =============================================================================
 # SECURITY SETTINGS
 # =============================================================================
 
