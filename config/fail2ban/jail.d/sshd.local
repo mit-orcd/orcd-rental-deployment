@@ -12,8 +12,9 @@
 enabled = true
 port = ssh
 filter = sshd
-logpath = /var/log/secure
-backend = auto
+
+# Amazon Linux 2023 uses journald, not /var/log/secure
+backend = systemd
 
 # Use firewalld (Amazon Linux default)
 banaction = firewallcmd-rich-rules
