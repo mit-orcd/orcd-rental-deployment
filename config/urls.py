@@ -26,3 +26,13 @@ urlpatterns += [
     path('', include('coldfront_orcd_direct_charge.urls')),
 ]
 
+# Add django-su URLs (admin user switching)
+# This is used by ColdFront templates for the admin impersonation feature
+try:
+    import django_su
+    urlpatterns += [
+        path('su/', include('django_su.urls')),
+    ]
+except ImportError:
+    pass  # django-su not installed
+
