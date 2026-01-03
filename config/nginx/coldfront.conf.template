@@ -4,86 +4,143 @@
 #
 # This is a TEMPLATE file. Replace {{DOMAIN_NAME}} with your actual domain.
 #
-# INSTALLATION ORDER:
-#   1. Copy this file to /etc/nginx/conf.d/coldfront.conf
+# INSTALLATION:
+#   1. Copy to /etc/nginx/conf.d/coldfront.conf
 #   2. Replace {{DOMAIN_NAME}} with your domain
-#   3. Comment out or remove the HTTPS server block (lines starting with #SSL)
-#   4. Start nginx: sudo systemctl start nginx
-#   5. Run certbot: sudo certbot --nginx -d YOUR_DOMAIN
-#   6. Certbot will automatically configure SSL
+#   3. Run certbot to get SSL certificate:
+#      sudo certbot certonly --webroot -w /var/www/html -d {{DOMAIN_NAME}}
+#   4. Restart nginx: sudo systemctl restart nginx
 #
 # =============================================================================
 
-# HTTP server - initially serves content, then redirects to HTTPS after SSL setup
+# =============================================================================
+# SECURITY: Catch-all servers to reject unknown domains
+# =============================================================================
+# These prevent domain spoofing and reduce exposure to scanners
+
+# Reject HTTP requests for unknown domains
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    return 444;  # Nginx special: close connection without response
+}
+
+# Reject HTTPS requests for unknown domains
+server {
+    listen 443 default_server ssl;
+    listen [::]:443 default_server ssl;
+    server_name _;
+    
+    # Self-signed cert for rejecting unknown domains (or use ssl_reject_handshake on newer nginx)
+    # For nginx 1.19.4+, you can use: ssl_reject_handshake on;
+    ssl_certificate /etc/letsencrypt/live/{{DOMAIN_NAME}}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{DOMAIN_NAME}}/privkey.pem;
+    
+    return 444;
+}
+
+# =============================================================================
+# HTTP Server - Redirect to HTTPS
+# =============================================================================
 server {
     listen 80;
     listen [::]:80;
     server_name {{DOMAIN_NAME}};
     
-    # For Let's Encrypt certificate validation
+    # Allow Let's Encrypt certificate validation
     location /.well-known/acme-challenge/ {
         root /var/www/html;
     }
+    
+    # Redirect all other HTTP traffic to HTTPS
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
 
-    # After SSL is set up, certbot will add a redirect here
-    # For now, proxy to the application
+# =============================================================================
+# HTTPS Server - Main Application
+# =============================================================================
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name {{DOMAIN_NAME}};
+
+    # -------------------------------------------------------------------------
+    # SSL Configuration
+    # -------------------------------------------------------------------------
+    ssl_certificate /etc/letsencrypt/live/{{DOMAIN_NAME}}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{DOMAIN_NAME}}/privkey.pem;
+    
+    # SSL Best Practices
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    
+    # OCSP Stapling (optional, improves performance)
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    resolver 8.8.8.8 8.8.4.4 valid=300s;
+    resolver_timeout 5s;
+
+    # -------------------------------------------------------------------------
+    # Security Headers
+    # -------------------------------------------------------------------------
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    
+    # HSTS - uncomment after confirming HTTPS works
+    # add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    # -------------------------------------------------------------------------
+    # Favicon - Reduce log noise
+    # -------------------------------------------------------------------------
+    location = /favicon.ico {
+        access_log off;
+        log_not_found off;
+        # Try static files first, then return empty
+        try_files /static/common/favicon.ico =204;
+    }
+
+    # -------------------------------------------------------------------------
+    # Static Files
+    # -------------------------------------------------------------------------
     location /static/ {
         alias /srv/coldfront/static/;
         expires 30d;
         add_header Cache-Control "public, immutable";
+        
+        # Gzip compression
+        gzip on;
+        gzip_types text/css application/javascript application/json image/svg+xml;
     }
 
+    # -------------------------------------------------------------------------
+    # Application Proxy
+    # -------------------------------------------------------------------------
     location / {
         proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_pass http://unix:/srv/coldfront/coldfront.sock;
+        
+        # Timeouts
         proxy_connect_timeout 60s;
         proxy_send_timeout 60s;
         proxy_read_timeout 60s;
     }
-}
 
-# =============================================================================
-# HTTPS server block - UNCOMMENT AFTER running certbot
-# =============================================================================
-# Certbot will automatically create and configure the HTTPS server block.
-# The configuration below is for reference or manual setup.
-#
-# server {
-#     listen 443 ssl;
-#     listen [::]:443 ssl;
-#     http2 on;
-#     server_name {{DOMAIN_NAME}};
-#
-#     ssl_certificate /etc/letsencrypt/live/{{DOMAIN_NAME}}/fullchain.pem;
-#     ssl_certificate_key /etc/letsencrypt/live/{{DOMAIN_NAME}}/privkey.pem;
-#     include /etc/letsencrypt/options-ssl-nginx.conf;
-#     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
-#
-#     # Security Headers
-#     add_header X-Frame-Options "SAMEORIGIN" always;
-#     add_header X-Content-Type-Options "nosniff" always;
-#     add_header X-XSS-Protection "1; mode=block" always;
-#     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-#
-#     location /static/ {
-#         alias /srv/coldfront/static/;
-#         expires 30d;
-#         add_header Cache-Control "public, immutable";
-#         gzip on;
-#         gzip_types text/css application/javascript application/json image/svg+xml;
-#     }
-#
-#     location / {
-#         proxy_set_header Host $http_host;
-#         proxy_set_header X-Real-IP $remote_addr;
-#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-#         proxy_set_header X-Forwarded-Proto $scheme;
-#         proxy_pass http://unix:/srv/coldfront/coldfront.sock;
-#         proxy_connect_timeout 60s;
-#         proxy_send_timeout 60s;
-#         proxy_read_timeout 60s;
-#     }
-# }
+    # -------------------------------------------------------------------------
+    # Error Pages
+    # -------------------------------------------------------------------------
+    error_page 500 502 503 504 /50x.html;
+    location = /50x.html {
+        root /usr/share/nginx/html;
+    }
+}
