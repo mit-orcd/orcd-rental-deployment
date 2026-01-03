@@ -232,18 +232,26 @@ echo ""
 # Web Response Test
 echo "--- Web Response Test ---"
 if command -v curl &> /dev/null; then
-    # Test HTTP redirect
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/ 2>/dev/null || echo "000")
+    # Get domain from nginx config for proper Host header testing
+    TEST_DOMAIN=$(grep -oP 'server_name\s+\K[^;]+' /etc/nginx/conf.d/coldfront.conf 2>/dev/null | head -1 | awk '{print $1}')
+    if [[ -z "${TEST_DOMAIN}" ]]; then
+        TEST_DOMAIN="localhost"
+    fi
+    
+    # Test HTTP redirect (use domain as Host header)
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: ${TEST_DOMAIN}" http://localhost/ 2>/dev/null || echo "000")
     if [[ "${HTTP_CODE}" == "301" || "${HTTP_CODE}" == "302" ]]; then
         check_pass "HTTP redirects to HTTPS (${HTTP_CODE})"
     elif [[ "${HTTP_CODE}" == "000" ]]; then
         check_fail "Cannot connect to HTTP"
+    elif [[ "${HTTP_CODE}" == "200" ]]; then
+        check_warn "HTTP returns 200 (no HTTPS redirect configured)"
     else
         check_warn "HTTP returns ${HTTP_CODE} (expected 301/302)"
     fi
     
-    # Test HTTPS
-    HTTPS_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k https://localhost/ 2>/dev/null || echo "000")
+    # Test HTTPS (use domain as Host header)
+    HTTPS_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k -H "Host: ${TEST_DOMAIN}" https://localhost/ 2>/dev/null || echo "000")
     if [[ "${HTTPS_CODE}" == "200" || "${HTTPS_CODE}" == "302" ]]; then
         check_pass "HTTPS responds (${HTTPS_CODE})"
     elif [[ "${HTTPS_CODE}" == "000" ]]; then
