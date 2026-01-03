@@ -143,23 +143,28 @@ generate_local_settings() {
     
     log_info "Generating local_settings.py..."
     
-    # Create from template and replace placeholders
+    # Save a copy in secrets directory first (always works)
+    mkdir -p "${SECRETS_DIR}"
     sed -e "s|{{SECRET_KEY}}|${SECRET_KEY}|g" \
         -e "s|{{DOMAIN_NAME}}|${DOMAIN_NAME}|g" \
         -e "s|{{OIDC_CLIENT_ID}}|${OIDC_CLIENT_ID}|g" \
         -e "s|{{OIDC_CLIENT_SECRET}}|${OIDC_CLIENT_SECRET}|g" \
-        "${TEMPLATE}" > "${OUTPUT}"
-    
-    # Set permissions
-    chmod 600 "${OUTPUT}"
-    
-    # Also save a copy in secrets directory for backup
-    mkdir -p "${SECRETS_DIR}"
-    cp "${OUTPUT}" "${SECRETS_COPY}"
+        "${TEMPLATE}" > "${SECRETS_COPY}"
     chmod 600 "${SECRETS_COPY}"
+    log_info "Backup created: ${SECRETS_COPY}"
     
-    log_info "Created: ${OUTPUT}"
-    log_info "Backup: ${SECRETS_COPY}"
+    # Try to copy to app directory (may need sudo)
+    if cp "${SECRETS_COPY}" "${OUTPUT}" 2>/dev/null; then
+        chmod 600 "${OUTPUT}"
+        log_info "Created: ${OUTPUT}"
+    else
+        log_warn "Could not write to ${OUTPUT} (permission denied)"
+        log_warn "Copying with sudo..."
+        sudo cp "${SECRETS_COPY}" "${OUTPUT}"
+        sudo chown ec2-user:ec2-user "${OUTPUT}"
+        sudo chmod 600 "${OUTPUT}"
+        log_info "Created: ${OUTPUT} (using sudo)"
+    fi
 }
 
 generate_coldfront_env() {
@@ -174,22 +179,27 @@ generate_coldfront_env() {
     
     log_info "Generating coldfront.env..."
     
-    # Create from template and replace placeholders
+    # Save a copy in secrets directory first (always works)
+    mkdir -p "${SECRETS_DIR}"
     sed -e "s|{{SECRET_KEY}}|${SECRET_KEY}|g" \
         -e "s|{{OIDC_CLIENT_ID}}|${OIDC_CLIENT_ID}|g" \
         -e "s|{{OIDC_CLIENT_SECRET}}|${OIDC_CLIENT_SECRET}|g" \
-        "${TEMPLATE}" > "${OUTPUT}"
-    
-    # Set permissions
-    chmod 600 "${OUTPUT}"
-    
-    # Also save a copy in secrets directory for backup
-    mkdir -p "${SECRETS_DIR}"
-    cp "${OUTPUT}" "${SECRETS_COPY}"
+        "${TEMPLATE}" > "${SECRETS_COPY}"
     chmod 600 "${SECRETS_COPY}"
+    log_info "Backup created: ${SECRETS_COPY}"
     
-    log_info "Created: ${OUTPUT}"
-    log_info "Backup: ${SECRETS_COPY}"
+    # Try to copy to app directory (may need sudo)
+    if cp "${SECRETS_COPY}" "${OUTPUT}" 2>/dev/null; then
+        chmod 600 "${OUTPUT}"
+        log_info "Created: ${OUTPUT}"
+    else
+        log_warn "Could not write to ${OUTPUT} (permission denied)"
+        log_warn "Copying with sudo..."
+        sudo cp "${SECRETS_COPY}" "${OUTPUT}"
+        sudo chown ec2-user:ec2-user "${OUTPUT}"
+        sudo chmod 600 "${OUTPUT}"
+        log_info "Created: ${OUTPUT} (using sudo)"
+    fi
 }
 
 generate_nginx_config() {
