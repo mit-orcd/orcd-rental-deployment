@@ -172,11 +172,30 @@ preflight_checks() {
     
     # Check domain resolves
     log_info "Checking DNS resolution for ${DOMAIN_NAME}..."
-    if ! host "${DOMAIN_NAME}" &> /dev/null && ! dig +short "${DOMAIN_NAME}" &> /dev/null; then
-        log_warn "DNS lookup failed for ${DOMAIN_NAME}"
-        log_warn "Make sure DNS is configured before obtaining SSL certificate"
+    if command -v host >/dev/null 2>&1; then
+        if host "${DOMAIN_NAME}" >/dev/null 2>&1; then
+            log_info "DNS resolution OK"
+        else
+            log_warn "DNS lookup failed for ${DOMAIN_NAME}"
+            log_warn "Make sure DNS is configured before obtaining SSL certificate"
+        fi
+    elif command -v dig >/dev/null 2>&1; then
+        # Consider DNS OK if dig returns a non-empty result
+        if [[ -n "$(dig +short "${DOMAIN_NAME}" 2>/dev/null)" ]]; then
+            log_info "DNS resolution OK"
+        else
+            log_warn "DNS lookup failed for ${DOMAIN_NAME}"
+            log_warn "Make sure DNS is configured before obtaining SSL certificate"
+        fi
+    elif command -v getent >/dev/null 2>&1; then
+        if getent hosts "${DOMAIN_NAME}" >/dev/null 2>&1; then
+            log_info "DNS resolution OK"
+        else
+            log_warn "DNS lookup failed for ${DOMAIN_NAME}"
+            log_warn "Make sure DNS is configured before obtaining SSL certificate"
+        fi
     else
-        log_info "DNS resolution OK"
+        log_warn "No DNS lookup tools found (host, dig, getent); skipping DNS resolution check"
     fi
     
     # Check ports are available
