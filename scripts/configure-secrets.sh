@@ -10,11 +10,16 @@
 #   chmod +x configure-secrets.sh
 #   ./configure-secrets.sh
 #
+# Prerequisites:
+#   - install_nginx_base.sh must have been run first (Nginx with HTTPS)
+#   - install.sh must have been run (ColdFront installed)
+#
 # This script will:
 #   1. Prompt for Globus OAuth client ID and secret
 #   2. Prompt for your domain name
 #   3. Generate a Django secret key
 #   4. Create local_settings.py and coldfront.env from templates
+#   5. Optionally deploy ColdFront-specific Nginx configuration
 #
 # =============================================================================
 
@@ -58,6 +63,15 @@ prompt() {
 
 generate_secret_key() {
     python3 -c "import secrets; print(secrets.token_urlsafe(50))"
+}
+
+# Detect service user from deployment.conf or default
+detect_service_user() {
+    local DEPLOY_CONF="${CONFIG_DIR}/deployment.conf"
+    if [[ -f "${DEPLOY_CONF}" ]]; then
+        source "${DEPLOY_CONF}"
+    fi
+    SERVICE_USER="${SERVICE_USER:-ec2-user}"
 }
 
 # =============================================================================
@@ -161,7 +175,7 @@ generate_local_settings() {
         log_warn "Could not write to ${OUTPUT} (permission denied)"
         log_warn "Copying with sudo..."
         sudo cp "${SECRETS_COPY}" "${OUTPUT}"
-        sudo chown ec2-user:ec2-user "${OUTPUT}"
+        sudo chown "${SERVICE_USER}:${SERVICE_USER}" "${OUTPUT}"
         sudo chmod 600 "${OUTPUT}"
         log_info "Created: ${OUTPUT} (using sudo)"
     fi
@@ -196,39 +210,15 @@ generate_coldfront_env() {
         log_warn "Could not write to ${OUTPUT} (permission denied)"
         log_warn "Copying with sudo..."
         sudo cp "${SECRETS_COPY}" "${OUTPUT}"
-        sudo chown ec2-user:ec2-user "${OUTPUT}"
+        sudo chown "${SERVICE_USER}:${SERVICE_USER}" "${OUTPUT}"
         sudo chmod 600 "${OUTPUT}"
         log_info "Created: ${OUTPUT} (using sudo)"
     fi
 }
 
-generate_nginx_config() {
-    local TEMPLATE="${CONFIG_DIR}/nginx/coldfront-http.conf.template"
-    local OUTPUT="/etc/nginx/conf.d/coldfront.conf"
-    
-    if [[ ! -f "${TEMPLATE}" ]]; then
-        log_error "Template not found: ${TEMPLATE}"
-        exit 1
-    fi
-    
-    prompt "Generate Nginx configuration? (requires sudo) (y/n)"
-    read -r CONFIRM
-    if [[ ! "${CONFIRM}" =~ ^[Yy]$ ]]; then
-        log_warn "Skipping Nginx configuration"
-        echo "You can generate it later with:"
-        echo "  sudo sed 's/{{DOMAIN_NAME}}/${DOMAIN_NAME}/g' ${TEMPLATE} > ${OUTPUT}"
-        return
-    fi
-    
-    log_info "Generating HTTP-only Nginx configuration..."
-    
-    # Need sudo for /etc/nginx/conf.d
-    sudo sed "s|{{DOMAIN_NAME}}|${DOMAIN_NAME}|g" "${TEMPLATE}" > "/tmp/coldfront.conf.tmp"
-    sudo mv "/tmp/coldfront.conf.tmp" "${OUTPUT}"
-    
-    log_info "Created: ${OUTPUT} (HTTP-only)"
-    log_warn "Note: SSL certificates will be added by certbot"
-    log_warn "Run: sudo certbot --nginx -d ${DOMAIN_NAME}"
+deploy_coldfront_nginx() {
+    log_warn "Nginx deployment has moved to scripts/install_nginx_app.sh"
+    log_warn "Run: sudo ./scripts/install_nginx_app.sh --domain ${DOMAIN_NAME}"
 }
 
 # =============================================================================
@@ -253,26 +243,32 @@ print_next_steps() {
     echo ""
     echo "Next steps:"
     echo ""
-    echo "1. If Nginx config was skipped, generate it:"
-    echo "   sudo sed 's/{{DOMAIN_NAME}}/${DOMAIN_NAME}/g' \\"
-    echo "       ${CONFIG_DIR}/nginx/coldfront-http.conf.template \\"
-    echo "       > /etc/nginx/conf.d/coldfront.conf"
+    echo "1. Deploy ColdFront Nginx app config:"
+    echo "   sudo ./scripts/install_nginx_app.sh --domain ${DOMAIN_NAME}"
     echo ""
-    echo "2. Get SSL certificate (certbot will add HTTPS automatically):"
-    echo "   sudo certbot --nginx -d ${DOMAIN_NAME}"
-    echo ""
-    echo "3. Initialize database:"
+    echo "2. Initialize database:"
     echo "   cd ${APP_DIR}"
     echo "   source venv/bin/activate"
     echo "   export DJANGO_SETTINGS_MODULE=local_settings"
     echo "   export PLUGIN_API=True AUTO_PI_ENABLE=True AUTO_DEFAULT_PROJECT_ENABLE=True"
     echo "   coldfront migrate"
+    echo "   coldfront initial_setup"
+    echo "   coldfront makemigrations"
+    echo "   coldfront migrate"
     echo "   coldfront collectstatic --noinput"
     echo "   coldfront createsuperuser"
     echo ""
-    echo "4. Start services:"
+    echo "3. Fix permissions:"
+    echo "   sudo chown ${SERVICE_USER}:${SERVICE_USER} ${APP_DIR}/coldfront.db"
+    echo "   sudo chmod 664 ${APP_DIR}/coldfront.db"
+    echo "   sudo chmod -R 755 ${APP_DIR}/static"
+    echo ""
+    echo "4. Start ColdFront service:"
+    echo "   sudo systemctl enable coldfront"
     echo "   sudo systemctl start coldfront"
-    echo "   sudo systemctl restart nginx"
+    echo ""
+    echo "5. Verify the site is working:"
+    echo "   curl -I https://${DOMAIN_NAME}/"
     echo ""
 }
 
@@ -295,12 +291,11 @@ main() {
         exit 1
     fi
     
+    detect_service_user
     collect_inputs
     generate_local_settings
     generate_coldfront_env
-    generate_nginx_config
     print_next_steps
 }
 
 main "$@"
-
