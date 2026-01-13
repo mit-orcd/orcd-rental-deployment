@@ -172,12 +172,12 @@ install_system_packages() {
     
     case "${PKG_MANAGER}" in
         dnf)
-            dnf update -y
+    dnf update -y
             dnf install -y python3 python3-devel python3-pip git redis6
-            dnf groupinstall -y "Development Tools"
-            
-            log_info "Enabling and starting Redis..."
-            systemctl enable --now redis6
+    dnf groupinstall -y "Development Tools"
+
+    log_info "Enabling and starting Redis..."
+    systemctl enable --now redis6
             ;;
         apt)
             apt-get update
@@ -216,7 +216,8 @@ install_coldfront() {
     sudo -u "${SERVICE_USER}" "${VENV_DIR}/bin/pip" install gunicorn mozilla-django-oidc pyjwt requests
     
     log_info "Installing ORCD Direct Charge plugin: ${PLUGIN_VERSION} from ${PLUGIN_REPO}..."
-    sudo -u "${SERVICE_USER}" "${VENV_DIR}/bin/pip" install "git+${PLUGIN_REPO}@${PLUGIN_VERSION}"
+    # Use --no-cache-dir to ensure we always fetch the latest commit for branch references
+    sudo -u "${SERVICE_USER}" "${VENV_DIR}/bin/pip" install --no-cache-dir --upgrade "git+${PLUGIN_REPO}@${PLUGIN_VERSION}"
     
     log_info "Installation complete"
     log_info "  ColdFront: ${COLDFRONT_VERSION}"
