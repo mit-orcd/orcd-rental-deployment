@@ -1,6 +1,6 @@
 #!/bin/bash
 # Host setup script for Amazon Linux EC2
-# Installs Apptainer with suid support and configures networking
+# Installs Apptainer and configures networking (run as root)
 set -e
 
 # =============================================================================

@@ -308,7 +308,7 @@ The CNI configuration also includes a `tuning` plugin to disable offloading:
    - `iptables` - Packet filtering and NAT
    - `iptables-services` - Persistence of iptables rules
    - `ethtool` - Network interface configuration
-   - `apptainer` (with suid) - Container runtime
+   - `apptainer` - Container runtime (run as root; suid install not required)
 
 ### For Physical Hosts / Other VMs
 
@@ -337,8 +337,8 @@ The CNI configuration also includes a `tuning` plugin to disable offloading:
 ### Apptainer Requirements
 
 1. **Installation with SUID**
-   - Apptainer must be installed with setuid support for `--boot` to work
-   - Typically requires building from source or using `apptainer-suid` package
+   - Run Apptainer commands as root; suid install is not required when running as root
+   - For non-root usage, setuid support would be needed (build from source or use `apptainer-suid` package)
 
 2. **CNI Plugins**
    - Bridge plugin (standard)

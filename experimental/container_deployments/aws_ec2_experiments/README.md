@@ -27,7 +27,7 @@ Shares the host's network namespace (`--netns-path /proc/1/ns/net`) and uses sys
 ## Prerequisites
 
 - Amazon Linux 2023 EC2 instance (or compatible RHEL-based distro)
-- Apptainer installed with setuid support (`--boot` requires suid)
+- Apptainer installed (run as root; suid install not required when running as root)
 - Security group allowing inbound traffic on service ports (80, 443, etc.)
 
 ## Quick Comparison

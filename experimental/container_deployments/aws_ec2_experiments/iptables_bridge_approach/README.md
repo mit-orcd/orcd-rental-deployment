@@ -16,7 +16,7 @@ This directory contains scripts and configuration for running ColdFront inside a
 
 1. **Security Group**: Ensure ports 80 and 443 are open for inbound traffic
 2. **Amazon Linux 2023** EC2 instance (or compatible RHEL-based distro)
-3. **Apptainer** installed with setuid support
+3. **Apptainer** installed (run as root; suid install not required)
 
 ## Quick Start
 
