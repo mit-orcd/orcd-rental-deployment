@@ -84,6 +84,55 @@ systemctl status nginx
 | `scripts/teardown.sh [name]` | Stop container and clean up |
 | `scripts/rebuild.sh [name]` | Full teardown + rebuild + start |
 
+## Core Apptainer Commands
+
+The scripts wrap these apptainer commands. For manual control or debugging, you can run them directly:
+
+### Start a booted container instance
+
+```bash
+apptainer instance start \
+    --boot \
+    --writable-tmpfs \
+    --net \
+    --network my_bridge \
+    --network-args "IP=10.22.0.8" \
+    -B /sys/fs/cgroup \
+    amazonlinux-systemd.sif devcontainer
+```
+
+Key flags:
+- `--boot` — Run `/sbin/init` (systemd) as PID 1
+- `--writable-tmpfs` — Ephemeral writable overlay (changes lost on stop)
+- `--net --network my_bridge` — Use the CNI bridge network
+- `--network-args "IP=..."` — Assign a specific IP address
+- `-B /sys/fs/cgroup` — Bind cgroup filesystem for systemd
+
+### Execute a command in the running instance
+
+```bash
+# Interactive shell
+apptainer exec instance://devcontainer bash
+
+# Run a specific command
+apptainer exec instance://devcontainer systemctl status nginx
+
+# Check the container's IP address
+apptainer exec instance://devcontainer ip addr show eth0
+```
+
+### Stop the instance
+
+```bash
+apptainer instance stop devcontainer
+```
+
+### List running instances
+
+```bash
+apptainer instance list
+```
+
 ## File Structure
 
 ```
