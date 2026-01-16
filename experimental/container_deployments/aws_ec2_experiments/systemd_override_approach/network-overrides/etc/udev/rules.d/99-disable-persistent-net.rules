@@ -1,0 +1,2 @@
+# Prevent udev from generating persistent net rules inside the container.
+SUBSYSTEM=="net", ACTION=="add", ENV{PERSISTENT_NET_RULES_GENERATOR}="no"
