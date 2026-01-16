@@ -34,7 +34,7 @@ Introduces `deployment.conf` to centralize configuration for plugin installation
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| `PLUGIN_REPO` | Plugin repository URL | `https://github.com/christophernhill/cf-orcd-rental.git` |
+| `PLUGIN_REPO` | Plugin repository URL | `https://github.com/mit-orcd/cf-orcd-rental.git` |
 | `PLUGIN_VERSION` | Git tag or branch | `v0.1` |
 | `COLDFRONT_VERSION` | ColdFront package spec | `coldfront[common]` |
 | `APP_DIR` | Installation directory | `/srv/coldfront` |
@@ -73,7 +73,7 @@ Can you make a plan to use a feature branch and a PR with this repo to make a ch
 
 Guide and scripts should be changed to allow 
 
-1. installation of a specific tag from https://github.com/christophernhill/cf-orcd-rental 
+1. installation of a specific tag from https://github.com/mit-orcd/cf-orcd-rental 
 
 2. add instructions for upgrading to use a different tag in an existing deployment. 
 

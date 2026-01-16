@@ -144,7 +144,7 @@ sudo dnf install -y git  # Amazon Linux / RHEL
 # sudo apt install -y git  # Debian / Ubuntu
 
 # Clone repository
-git clone https://github.com/christophernhill/orcd-rental-deployment.git
+git clone https://github.com/mit-orcd/orcd-rental-deployment.git
 cd orcd-rental-deployment
 ```
 
@@ -285,7 +285,7 @@ nano config/deployment.conf
 # Change PLUGIN_VERSION="v0.1" to desired version
 ```
 
-Available versions: https://github.com/christophernhill/cf-orcd-rental/tags
+Available versions: https://github.com/mit-orcd/cf-orcd-rental/tags
 
 ### 4.2 Run ColdFront Installation
 
@@ -829,9 +829,9 @@ The ORCD plugin uses git tags to signal new releases. Check for available versio
 
 ```bash
 # View available tags on GitHub
-curl -s https://api.github.com/repos/christophernhill/cf-orcd-rental/tags | grep '"name"'
+curl -s https://api.github.com/repos/mit-orcd/cf-orcd-rental/tags | grep '"name"'
 
-# Or visit: https://github.com/christophernhill/cf-orcd-rental/tags
+# Or visit: https://github.com/mit-orcd/cf-orcd-rental/tags
 ```
 
 #### Upgrade Steps
@@ -844,7 +844,7 @@ source venv/bin/activate
 pip install --upgrade coldfront[common]
 
 # Upgrade ORCD plugin (change @v0.1 to desired version)
-pip install --upgrade git+https://github.com/christophernhill/cf-orcd-rental.git@v0.1
+pip install --upgrade git+https://github.com/mit-orcd/cf-orcd-rental.git@v0.1
 
 # Apply any new migrations
 export PYTHONPATH=/srv/coldfront
