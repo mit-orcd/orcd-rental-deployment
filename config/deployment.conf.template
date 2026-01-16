@@ -18,7 +18,7 @@
 # Plugin repository URL
 # Default: Official ORCD Direct Charge plugin repository
 # Customize: Point to your fork or alternative repository
-PLUGIN_REPO="https://github.com/christophernhill/cf-orcd-rental.git"
+PLUGIN_REPO="https://github.com/mit-orcd/cf-orcd-rental.git"
 
 # Plugin version (git tag or branch name)
 # 
@@ -29,8 +29,8 @@ PLUGIN_REPO="https://github.com/christophernhill/cf-orcd-rental.git"
 #   - "develop" - Install development branch
 #
 # To see available tags:
-#   Visit: https://github.com/christophernhill/cf-orcd-rental/tags
-#   Or run: git ls-remote --tags https://github.com/christophernhill/cf-orcd-rental.git
+#   Visit: https://github.com/mit-orcd/cf-orcd-rental/tags
+#   Or run: git ls-remote --tags https://github.com/mit-orcd/cf-orcd-rental.git
 #
 # Default: v0.1 (current stable release)
 PLUGIN_VERSION="v0.1"
@@ -123,7 +123,7 @@ SERVICE_GROUP="nginx"
 #   3. Or manually: pip install --upgrade git+PLUGIN_REPO@PLUGIN_VERSION
 #
 # Available plugin versions:
-#   https://github.com/christophernhill/cf-orcd-rental/tags
+#   https://github.com/mit-orcd/cf-orcd-rental/tags
 #
 # =============================================================================
 
