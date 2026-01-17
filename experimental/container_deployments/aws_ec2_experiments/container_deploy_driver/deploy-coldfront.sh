@@ -415,21 +415,23 @@ phase3_nginx_app() {
 initialize_database() {
     log_section "Section 8: Initializing Database"
     
-    # Activate virtualenv for coldfront commands
+    # Activate virtualenv and set Django settings for coldfront commands
+    # DJANGO_SETTINGS_MODULE=local_settings ensures the plugin is loaded
     local venv_activate="source /srv/coldfront/venv/bin/activate"
     local coldfront_dir="cd /srv/coldfront"
+    local django_env="export DJANGO_SETTINGS_MODULE=local_settings"
     
-    # Run migrations
+    # Run migrations (includes plugin migrations)
     log_info "Running database migrations"
-    container_exec_user "$coldfront_dir && $venv_activate && coldfront migrate"
+    container_exec_user "$coldfront_dir && $venv_activate && $django_env && coldfront migrate"
     
     # Run initial_setup with automatic 'yes'
     log_info "Running coldfront initial_setup"
-    container_exec_user "$coldfront_dir && $venv_activate && echo 'yes' | coldfront initial_setup"
+    container_exec_user "$coldfront_dir && $venv_activate && $django_env && echo 'yes' | coldfront initial_setup"
     
     # Create superuser non-interactively
     log_info "Creating superuser: $SUPERUSER_NAME"
-    container_exec_user "$coldfront_dir && $venv_activate && \
+    container_exec_user "$coldfront_dir && $venv_activate && $django_env && \
         DJANGO_SUPERUSER_PASSWORD='$SUPERUSER_PASSWORD' \
         coldfront createsuperuser --noinput \
             --username '$SUPERUSER_NAME' \
@@ -437,7 +439,7 @@ initialize_database() {
     
     # Collect static files for CSS/JS
     log_info "Collecting static files..."
-    container_exec_user "$coldfront_dir && $venv_activate && coldfront collectstatic --noinput"
+    container_exec_user "$coldfront_dir && $venv_activate && $django_env && coldfront collectstatic --noinput"
     
     log_success "Database initialized"
 }
@@ -451,25 +453,26 @@ load_fixtures() {
     
     local venv_activate="source /srv/coldfront/venv/bin/activate"
     local coldfront_dir="cd /srv/coldfront"
+    local django_env="export DJANGO_SETTINGS_MODULE=local_settings"
     
-    # Use app-qualified fixture names so Django can find them in the plugin package
-    local app_prefix="coldfront_orcd_direct_charge"
+    # Get the fixture directory path
+    local fixture_dir="/srv/coldfront/venv/lib/python3.9/site-packages/coldfront_orcd_direct_charge/fixtures"
     
     log_info "Loading node_types"
-    container_exec_user "$coldfront_dir && $venv_activate && coldfront loaddata ${app_prefix}/node_types" || \
-        log_warn "node_types fixture not found or already loaded"
+    container_exec_user "$coldfront_dir && $venv_activate && $django_env && coldfront loaddata ${fixture_dir}/node_types.json" || \
+        log_warn "node_types fixture failed to load"
     
     log_info "Loading gpu_node_instances"
-    container_exec_user "$coldfront_dir && $venv_activate && coldfront loaddata ${app_prefix}/gpu_node_instances" || \
-        log_warn "gpu_node_instances fixture not found or already loaded"
+    container_exec_user "$coldfront_dir && $venv_activate && $django_env && coldfront loaddata ${fixture_dir}/gpu_node_instances.json" || \
+        log_warn "gpu_node_instances fixture failed to load"
     
     log_info "Loading cpu_node_instances"
-    container_exec_user "$coldfront_dir && $venv_activate && coldfront loaddata ${app_prefix}/cpu_node_instances" || \
-        log_warn "cpu_node_instances fixture not found or already loaded"
+    container_exec_user "$coldfront_dir && $venv_activate && $django_env && coldfront loaddata ${fixture_dir}/cpu_node_instances.json" || \
+        log_warn "cpu_node_instances fixture failed to load"
     
     log_info "Loading node_resource_types"
-    container_exec_user "$coldfront_dir && $venv_activate && coldfront loaddata ${app_prefix}/node_resource_types" || \
-        log_warn "node_resource_types fixture not found or already loaded"
+    container_exec_user "$coldfront_dir && $venv_activate && $django_env && coldfront loaddata ${fixture_dir}/node_resource_types.json" || \
+        log_warn "node_resource_types fixture failed to load"
     
     log_success "Fixtures loaded"
 }
@@ -483,15 +486,16 @@ setup_manager_groups() {
     
     local venv_activate="source /srv/coldfront/venv/bin/activate"
     local coldfront_dir="cd /srv/coldfront"
+    local django_env="export DJANGO_SETTINGS_MODULE=local_settings"
     
     log_info "Creating rental manager group"
-    container_exec_user "$coldfront_dir && $venv_activate && coldfront setup_rental_manager --create-group" || true
+    container_exec_user "$coldfront_dir && $venv_activate && $django_env && coldfront setup_rental_manager --create-group" || true
     
     log_info "Creating billing manager group"
-    container_exec_user "$coldfront_dir && $venv_activate && coldfront setup_billing_manager --create-group" || true
+    container_exec_user "$coldfront_dir && $venv_activate && $django_env && coldfront setup_billing_manager --create-group" || true
     
     log_info "Creating rate manager group"
-    container_exec_user "$coldfront_dir && $venv_activate && coldfront setup_rate_manager --create-group" || true
+    container_exec_user "$coldfront_dir && $venv_activate && $django_env && coldfront setup_rate_manager --create-group" || true
     
     log_success "Manager groups created"
 }
