@@ -435,6 +435,10 @@ initialize_database() {
             --username '$SUPERUSER_NAME' \
             --email '$SUPERUSER_EMAIL'" || log_warn "Superuser may already exist"
     
+    # Collect static files for CSS/JS
+    log_info "Collecting static files..."
+    container_exec_user "$coldfront_dir && $venv_activate && coldfront collectstatic --noinput"
+    
     log_success "Database initialized"
 }
 
@@ -448,17 +452,24 @@ load_fixtures() {
     local venv_activate="source /srv/coldfront/venv/bin/activate"
     local coldfront_dir="cd /srv/coldfront"
     
+    # Use app-qualified fixture names so Django can find them in the plugin package
+    local app_prefix="coldfront_orcd_direct_charge"
+    
     log_info "Loading node_types"
-    container_exec_user "$coldfront_dir && $venv_activate && coldfront loaddata node_types"
+    container_exec_user "$coldfront_dir && $venv_activate && coldfront loaddata ${app_prefix}/node_types" || \
+        log_warn "node_types fixture not found or already loaded"
     
     log_info "Loading gpu_node_instances"
-    container_exec_user "$coldfront_dir && $venv_activate && coldfront loaddata gpu_node_instances"
+    container_exec_user "$coldfront_dir && $venv_activate && coldfront loaddata ${app_prefix}/gpu_node_instances" || \
+        log_warn "gpu_node_instances fixture not found or already loaded"
     
     log_info "Loading cpu_node_instances"
-    container_exec_user "$coldfront_dir && $venv_activate && coldfront loaddata cpu_node_instances"
+    container_exec_user "$coldfront_dir && $venv_activate && coldfront loaddata ${app_prefix}/cpu_node_instances" || \
+        log_warn "cpu_node_instances fixture not found or already loaded"
     
     log_info "Loading node_resource_types"
-    container_exec_user "$coldfront_dir && $venv_activate && coldfront loaddata node_resource_types"
+    container_exec_user "$coldfront_dir && $venv_activate && coldfront loaddata ${app_prefix}/node_resource_types" || \
+        log_warn "node_resource_types fixture not found or already loaded"
     
     log_success "Fixtures loaded"
 }
