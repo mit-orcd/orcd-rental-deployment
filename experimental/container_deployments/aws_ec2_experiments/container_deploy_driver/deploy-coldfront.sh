@@ -298,18 +298,19 @@ clone_deployment_repo() {
     log_section "Section 2: Cloning Deployment Repository"
     
     local repo_url="https://github.com/mit-orcd/orcd-rental-deployment.git"
+    local repo_branch="cnh/container-deployment-experiments"
     local repo_dir="/home/$SERVICE_USER/orcd-rental-deployment"
     
     # Check if already cloned
     if container_exec_user "test -d $repo_dir"; then
-        log_info "Repository already exists, pulling latest"
-        container_exec_user "cd $repo_dir && git pull"
+        log_info "Repository already exists, updating..."
+        container_exec_user "cd $repo_dir && git fetch origin && git checkout $repo_branch && git pull origin $repo_branch"
     else
-        log_info "Cloning orcd-rental-deployment repository"
-        container_exec_user "cd ~ && git clone $repo_url"
+        log_info "Cloning orcd-rental-deployment repository (branch: $repo_branch)"
+        container_exec_user "cd ~ && git clone --branch $repo_branch $repo_url"
     fi
     
-    log_success "Repository ready at $repo_dir"
+    log_success "Repository ready at $repo_dir (branch: $repo_branch)"
 }
 
 # =============================================================================
