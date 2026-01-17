@@ -373,49 +373,24 @@ phase2_coldfront() {
 # =============================================================================
 # Section 6: Configure Secrets
 # =============================================================================
-# Generate config files directly instead of using interactive script
+# Use configure-secrets.sh with environment variables for non-interactive mode
 
 configure_secrets() {
     log_section "Section 6: Configuring Secrets"
     
-    local APP_DIR="/srv/coldfront"
-    local CONFIG_DIR="/home/$SERVICE_USER/orcd-rental-deployment/config"
-    
-    # Generate Django secret key
-    log_info "Generating Django secret key..."
-    local SECRET_KEY
-    SECRET_KEY=$(container_exec "python3 -c \"import secrets; print(secrets.token_urlsafe(50))\"")
-    
-    if [ -z "$SECRET_KEY" ]; then
-        log_error "Failed to generate secret key"
-        exit 1
-    fi
-    
-    # Generate coldfront.env from template
-    log_info "Creating coldfront.env..."
-    container_exec "sed -e 's|{{SECRET_KEY}}|${SECRET_KEY}|g' \
-        -e 's|{{OIDC_CLIENT_ID}}|${GLOBUS_CLIENT_ID}|g' \
-        -e 's|{{OIDC_CLIENT_SECRET}}|${GLOBUS_CLIENT_SECRET}|g' \
-        ${CONFIG_DIR}/coldfront.env.template > ${APP_DIR}/coldfront.env"
-    container_exec "chmod 600 ${APP_DIR}/coldfront.env"
-    container_exec "chown coldfront:coldfront ${APP_DIR}/coldfront.env" || true
-    
-    # Generate local_settings.py from template
-    log_info "Creating local_settings.py..."
-    container_exec "sed -e 's|{{DOMAIN_NAME}}|${DOMAIN}|g' \
-        ${CONFIG_DIR}/local_settings.py.template > ${APP_DIR}/local_settings.py"
-    container_exec "chmod 600 ${APP_DIR}/local_settings.py"
-    container_exec "chown coldfront:coldfront ${APP_DIR}/local_settings.py" || true
-    
-    # Copy supporting files (urls.py, wsgi.py, coldfront_auth.py)
-    log_info "Copying supporting configuration files..."
-    container_exec "cp ${CONFIG_DIR}/urls.py ${APP_DIR}/urls.py" || true
-    container_exec "cp ${CONFIG_DIR}/wsgi.py ${APP_DIR}/wsgi.py" || true
-    container_exec "cp ${CONFIG_DIR}/coldfront_auth.py ${APP_DIR}/coldfront_auth.py" || true
-    
-    log_success "Secrets and configuration files created"
+    log_info "Configuring Globus OIDC credentials"
     log_info "  Domain: $DOMAIN"
     log_info "  Globus Client ID: ${GLOBUS_CLIENT_ID:0:8}..."
+    
+    # Run configure-secrets.sh with environment variables set
+    # The script auto-detects when all env vars are set and runs non-interactively
+    container_exec_user "cd ~/orcd-rental-deployment && \
+        export DOMAIN_NAME='$DOMAIN' && \
+        export GLOBUS_CLIENT_ID='$GLOBUS_CLIENT_ID' && \
+        export GLOBUS_CLIENT_SECRET='$GLOBUS_CLIENT_SECRET' && \
+        ./scripts/configure-secrets.sh --non-interactive"
+    
+    log_success "Secrets and configuration files created"
 }
 
 # =============================================================================
