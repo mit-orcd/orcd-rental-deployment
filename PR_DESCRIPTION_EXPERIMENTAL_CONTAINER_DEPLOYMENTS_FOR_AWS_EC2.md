@@ -1,285 +1,133 @@
-# Add Deployment Configuration System
+# Automated ColdFront Deployment with deploy-coldfront.sh
 
 ## Summary
 
-Introduces `deployment.conf` to centralize configuration for plugin installation, including repository URL, version/tag, ColdFront version, and installation paths. This provides a foundation for version management and future upgrade automation.
+This PR introduces `deploy-coldfront.sh`, a fully automated deployment script for installing ColdFront with the ORCD Rental plugin inside an Apptainer container. The script orchestrates the complete deployment workflow, from user setup through service verification, eliminating manual intervention.
 
 ## Motivation
 
-**Problem:** Plugin version and repository were hardcoded in install.sh, making it difficult to:
-- Track which version is deployed
-- Install specific versions
-- Prepare for future upgrade automation
-- Customize installation paths consistently
+**Problem:** Deploying ColdFront in a container environment required:
+- Multiple manual steps with careful ordering
+- Interactive prompts that blocked automation
+- Knowledge of Django settings, environment variables, and fixture paths
+- Risk of missing steps or misconfiguration
 
-**Solution:** Centralized configuration file that is:
-- Version controlled
-- Self-documenting
-- Easy to modify
-- Foundation for future upgrade script
+**Solution:** A single automated script that:
+- Reads all configuration from a YAML file
+- Handles all deployment phases in correct order
+- Runs non-interactively with no prompts
+- Verifies prerequisites and provides clear error messages
+- Supports re-running with `--skip-prereqs` to avoid Let's Encrypt rate limits
 
-## Changes
+## Quick Start
 
-### New Files
-- ✨ `config/deployment.conf` - Live deployment configuration
-- 📝 `config/deployment.conf.template` - Configuration template with docs
+```bash
+# 1. Start the container with required options
+apptainer instance start \
+    --boot \
+    --writable-tmpfs \
+    --net \
+    --network my_bridge \
+    --network-args "IP=10.22.0.2" \
+    -B /sys/fs/cgroup \
+    /home/ec2-user/amazonlinux-systemd.sif devcontainer
 
-### Modified Files
-- 🔧 `scripts/install.sh` - Load and use deployment.conf
-- 📚 `README.md` - Document configuration system
-- 📚 `docs/admin-guide.md` - Update installation instructions
-- 📚 `docs/developer-guide.md` - Update release workflow
+# 2. Create configuration
+cp config/deploy-config.yaml.example config/deploy-config.yaml
+# Edit with your domain, Globus credentials, etc.
 
-## Configuration Options
+# 3. Run deployment
+./deploy-coldfront.sh config/deploy-config.yaml
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| `PLUGIN_REPO` | Plugin repository URL | `https://github.com/christophernhill/cf-orcd-rental.git` |
-| `PLUGIN_VERSION` | Git tag or branch | `v0.1` |
-| `COLDFRONT_VERSION` | ColdFront package spec | `coldfront[common]` |
-| `APP_DIR` | Installation directory | `/srv/coldfront` |
-| `VENV_DIR` | Virtual environment path | `/srv/coldfront/venv` |
-| `SERVICE_USER` | Service account | `ec2-user` |
-| `SERVICE_GROUP` | Web server group | `nginx` |
-
-## Testing Checklist
-
-- [ ] Fresh installation with default deployment.conf works
-- [ ] Installation with custom PLUGIN_VERSION works
-- [ ] Validation catches missing deployment.conf
-- [ ] Validation catches missing required variables
-- [ ] Documentation is accurate and complete
-- [ ] install.sh displays configuration during installation
-
-## Future Enhancements
-
-This PR lays groundwork for:
-- **Upgrade script** - Read target version from deployment.conf
-- **Version detection** - Compare installed vs configured version
-- **Multi-environment** - Different configs for dev/staging/prod
-- **Backup integration** - Configuration-aware backup paths
-
----
-
-## Development Artifacts
-
-### Initial User Request
-
-<details>
-<summary>Click to expand original prompt</summary>
-
-```
-Can you make a plan to use a feature branch and a PR with this repo to make a change as follows.
-
-Guide and scripts should be changed to allow 
-
-1. installation of a specific tag from https://github.com/christophernhill/cf-orcd-rental 
-
-2. add instructions for upgrading to use a different tag in an existing deployment. 
-
-In the making the plan consider how you would show any migrations that might be needed as part of a tag upgrade.
+# 4. For re-deployments (skip SSL to avoid rate limiting)
+./deploy-coldfront.sh --skip-prereqs config/deploy-config.yaml
 ```
 
-</details>
+## Deployment Workflow
 
-### Clarification Prompts
+The script executes 11 sections in order:
 
-<details>
-<summary>Click to expand clarification questions and answers</summary>
+| Section | Description |
+|---------|-------------|
+| **1. User Setup** | Creates service user with passwordless sudo |
+| **2. Clone Repository** | Clones orcd-rental-deployment to container |
+| **3. Configure Plugin** | Sets cf-orcd-rental version in deployment.conf |
+| **4. Phase 1 Prerequisites** | Installs Nginx, obtains Let's Encrypt SSL cert |
+| **5. Phase 2 ColdFront** | Installs ColdFront application and plugin |
+| **6. Configure Secrets** | Generates coldfront.env and local_settings.py with Globus OIDC |
+| **7. Phase 3 Nginx App** | Configures Nginx as reverse proxy for ColdFront |
+| **8. Initialize Database** | Runs migrate, initial_setup, makemigrations, collectstatic |
+| **9. Load Fixtures** | Loads node types and instance data |
+| **10. Manager Groups** | Creates rental, billing, and rate manager groups |
+| **11. Finalize** | Restarts services and verifies deployment |
 
-**Q1: Implementation Approach**
-- How should the plugin tag/version be specified during installation?
-- How should the upgrade process be implemented?
-- How should migration information be displayed during upgrades?
+## Pre-flight Checks
 
-**A1:** Use configuration file (deployment.conf) to specify repo and tag, support multiple methods with fallback order, create both upgrade script and documentation, show migrations interactively with confirmation.
+Before deployment, the script verifies:
 
-**Q2: PR Documentation**
-- Request to store prompts, plans, and debugging notes in PR
+1. **Container Running**: Confirms the Apptainer instance exists
+2. **Container IP/iptables Match**: Validates container IP matches DNAT rules for ports 80/443
+3. **SSL Certificates** (with `--skip-prereqs`): Verifies existing certs are valid
 
-**A2:** Create comprehensive PR_DESCRIPTION.md with all development artifacts
+## Configuration File
 
-**Q3: Backup Modularity**
-- Request to make backup functionality modular for potential separation
+All deployment parameters are specified in a YAML configuration file:
 
-**A3:** Design backup.sh as standalone utility that can be sourced
+```yaml
+domain: "rental.example.com"
+email: "admin@example.com"
 
-**Q4: Plan Scope**
-- Request to split into smaller focused plans
+superuser:
+  username: "admin"
+  email: "admin@example.com"
+  password: "secure-password"
 
-**A4:** Focus this PR on deployment.conf and installation only; defer backup and upgrade to future PRs
+globus:
+  client_id: "your-client-id"
+  client_secret: "your-client-secret"
 
-**Q5: PR Creation Method**
-- Can we use gh CLI to automate PR creation?
+plugin_version: "main"
 
-**A5:** Yes, use `gh pr create --body-file PR_DESCRIPTION.md` for full automation
+container:
+  instance_name: "devcontainer"
+  service_user: "ec2-user"
+```
 
-</details>
+## Key Features
 
-### Development Plan
+| Feature | Description |
+|---------|-------------|
+| **YAML Configuration** | All parameters in one file |
+| **Non-Interactive** | No prompts, fully automated |
+| **IP/iptables Verification** | Pre-flight networking check |
+| **Skip Prereqs Mode** | `--skip-prereqs` avoids Let's Encrypt rate limits |
+| **Globus OIDC Support** | Automated OAuth credential configuration |
+| **Fixture Loading** | Auto-loads node types and instances |
+| **Django Settings** | Properly sets DJANGO_SETTINGS_MODULE, PYTHONPATH, SECRET_KEY |
 
-<details>
-<summary>Click to expand complete development plan</summary>
+## Command-Line Options
 
-# Tag-Based Plugin Installation Configuration
+```
+Usage: ./deploy-coldfront.sh [OPTIONS] [config.yaml]
 
-## Overview
+Options:
+  --skip-prereqs    Skip install_prereqs.sh (nginx/SSL setup)
+                    Use if SSL certs are already configured
+  -h, --help        Show help message
+```
 
-This plan focuses on two main goals:
+## Directory Structure
 
-1. **Create deployment.conf** - Centralize configuration for plugin repository, version/tag, and installation settings
-2. **Feature Branch & PR with Development Artifacts** - Create a well-documented PR that includes all prompts, plans, and decision-making context
-
-**Out of scope** (for future plans):
-- Backup utility (backup.sh)
-- Upgrade script (upgrade.sh)
-- Migration display functionality
-
-## Implementation Details
-
-### 1. Create Configuration File System
-
-Create `config/deployment.conf` with centralized settings for plugin repository, version, ColdFront version, installation paths, and service configuration.
-
-**Benefits:**
-- **Version control** - Track which plugin version is deployed
-- **Consistency** - Single source of truth for installation parameters
-- **Easy upgrades** - Change version in one place (foundation for future upgrade script)
-- **Documentation** - Self-documenting configuration file
-
-### 2. Create Configuration Template
-
-Create `config/deployment.conf.template` with same content plus additional comments explaining how to choose versions, when to pin, and customization options.
-
-### 3. Update Installation Script
-
-Modify `scripts/install.sh` to:
-- Add `load_deployment_config()` function that sources and validates deployment.conf
-- Update `main()` to call load_deployment_config()
-- Update `install_coldfront()` to use configuration variables
-- Update `create_app_directory()` to use SERVICE_USER
-- Update other references to use variables from deployment.conf
-
-### 4. Update Documentation
-
-#### README.md
-- Add Configuration section explaining deployment.conf
-- Update Components section to mention version configuration
-
-#### docs/admin-guide.md
-- Add section 4.1 about reviewing deployment configuration
-- Update installation section to reference configuration
-
-#### docs/developer-guide.md
-- Add Deployment Configuration subsection to Release Practices
-- Document how to update default version for new installations
-
-### 5. Feature Branch Workflow
-
-Create feature branch following git best practices with clear, conventional commit messages.
-
-### 6. PR Documentation with Development Artifacts
-
-Create PR_DESCRIPTION.md containing:
-- Summary and motivation
-- Changes and configuration options
-- Testing checklist and future enhancements
-- Complete development artifacts (prompts, plans, implementation notes)
-
-### 7. Create the Pull Request (Automated with GitHub CLI)
-
-Use `gh pr create` command to automatically create PR with PR_DESCRIPTION.md as body, applying labels and setting branch references.
-
-</details>
-
-### Implementation Notes
-
-<details>
-<summary>Click to expand implementation decisions and notes</summary>
-
-**Configuration File Design:**
-- Chose bash script format for easy sourcing by install.sh
-- Validation function ensures all required variables present
-- Comments provide inline documentation
-- Template file helps new deployments
-
-**install.sh Modifications:**
-- Added load_deployment_config() function for clean separation
-- Validation happens early (fail fast principle)
-- Configuration displayed during installation for transparency
-- Maintains backward compatibility principles (though config is required)
-
-**Documentation Strategy:**
-- README: High-level overview of configuration
-- Admin Guide: Detailed installation/configuration steps
-- Developer Guide: Release and version management workflow
-- All docs link to plugin repository tags for version discovery
-
-**Version Control:**
-- deployment.conf IS committed (not in .gitignore)
-- Represents the default/recommended version for new installations
-- Local deployments can modify their copy
-- Template preserved for reference
-
-**Git Workflow:**
-- Feature branch: feature/deployment-config
-- Conventional commits with clear, descriptive messages
-- Separate commits for: config files, install.sh, documentation, PR description
-
-**Automated PR Creation:**
-- Used GitHub CLI (`gh`) for automated PR creation
-- PR description from file ensures complete development history
-- Labels applied automatically (enhancement, documentation)
-
-</details>
-
-### Testing Performed
-
-<details>
-<summary>Click to expand testing details</summary>
-
-[To be filled in during implementation]
-
-**Manual Testing:**
-- [ ] Fresh install on clean Amazon Linux 2023 instance
-- [ ] Install with custom plugin version (v0.2)
-- [ ] Validation with missing deployment.conf
-- [ ] Validation with incomplete deployment.conf
-- [ ] Documentation walkthrough accuracy
-
-**Edge Cases:**
-- [ ] Non-existent git tag handling
-- [ ] Invalid repository URL handling
-- [ ] Permission issues with SERVICE_USER
-
-</details>
+```
+container_deploy_driver/
+├── deploy-coldfront.sh              # Main deployment script
+├── config/
+│   ├── deploy-config.yaml.example   # Example config (committed)
+│   └── deploy-config.yaml           # Your config (gitignored)
+└── README.md                        # Usage documentation
+```
 
 ---
-
-## Reviewer Focus Areas
-
-1. **Configuration completeness** - Are all necessary settings captured?
-2. **Error handling** - Is validation comprehensive and helpful?
-3. **Documentation clarity** - Can admins follow the new process?
-4. **Future compatibility** - Does this support planned upgrade script?
-5. **Security** - Any concerns with sourcing deployment.conf?
-
-## Breaking Changes
-
-**None** - This is a new feature. Existing installations continue to work, though new installations require deployment.conf.
-
-## Migration Path
-
-For existing deployments: No action needed. This PR only affects fresh installations.
-
-## Related Issues
-
-[If applicable, link to GitHub issues]
-
-## License
-
-Consistent with repository license (same as ColdFront - AGPLv3)
-
 
 # Experimental Container Deployments for AWS EC2
 
