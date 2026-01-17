@@ -1,0 +1,25 @@
+Bootstrap: docker
+From: public.ecr.aws/amazonlinux/amazonlinux:2023
+
+%post
+    # Install systemd and essential tools
+    dnf install -y systemd systemd-libs
+    # Note: curl-minimal is already in base image, don't install full curl (conflicts)
+    dnf install -y sudo iproute net-tools procps-ng vim wget git
+    
+    # Mask units that don't work in containers
+    systemctl mask systemd-machine-id-commit.service
+    systemctl mask console-getty.service
+    systemctl mask dev-hugepages.mount
+    systemctl mask sys-fs-fuse-connections.mount
+    systemctl mask systemd-logind.service
+    systemctl mask systemd-remount-fs.service
+    
+    # Allow passwordless sudo for wheel group
+    echo "%wheel ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/wheel
+    
+    # Clean up
+    dnf clean all
+
+%startscript
+    exec /sbin/init
