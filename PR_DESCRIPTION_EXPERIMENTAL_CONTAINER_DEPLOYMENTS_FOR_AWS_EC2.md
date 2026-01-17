@@ -137,7 +137,7 @@ This PR adds three experimental approaches for running ColdFront inside Apptaine
 
 | Aspect | IP Tables Bridge | Container Deploy Driver | Systemd Override |
 |--------|------------------|------------------------|------------------|
-| Network isolation | Yes (separate namespace) | Yes (uses bridge) | No (shared with host) |
+| Network isolation | Yes (separate namespace) | Yes (IP Tables Bridge) | No (shared with host) |
 | NAT required | Yes | Yes | No |
 | InfiniBand/IPoIB support | Limited | Limited | Full |
 | Complexity | Higher (manual iptables) | Medium (automated) | Lower (bind mounts) |
