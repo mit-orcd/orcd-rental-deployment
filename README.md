@@ -46,7 +46,7 @@ sudo dnf install -y git  # Amazon Linux / RHEL
 # sudo apt install -y git  # Debian / Ubuntu
 
 # 1. Clone this repository
-git clone https://github.com/christophernhill/orcd-rental-deployment.git
+git clone https://github.com/mit-orcd/orcd-rental-deployment.git
 cd orcd-rental-deployment
 
 # 2. Set up DNS A record pointing to your server's IP address
@@ -103,7 +103,7 @@ The `config/deployment.conf` file controls key deployment settings:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `PLUGIN_REPO` | `https://github.com/christophernhill/cf-orcd-rental.git` | Plugin repository URL |
+| `PLUGIN_REPO` | `https://github.com/mit-orcd/cf-orcd-rental.git` | Plugin repository URL |
 | `PLUGIN_VERSION` | `v0.1` | Plugin version (git tag or branch) |
 | `COLDFRONT_VERSION` | `coldfront[common]` | ColdFront package version |
 | `APP_DIR` | `/srv/coldfront` | Installation directory |
@@ -116,7 +116,7 @@ The `config/deployment.conf` file controls key deployment settings:
 2. Change `PLUGIN_VERSION` to desired tag (e.g., `v0.2`)
 3. Run installation script
 
-**Available plugin versions:** https://github.com/christophernhill/cf-orcd-rental/tags
+**Available plugin versions:** https://github.com/mit-orcd/cf-orcd-rental/tags
 
 ## Documentation
 
@@ -222,7 +222,7 @@ The ORCD plugin is controlled by these environment variables:
 
 ### ORCD Direct Charge Plugin
 
-The plugin (from https://github.com/christophernhill/cf-orcd-rental) adds:
+The plugin (from https://github.com/mit-orcd/cf-orcd-rental) adds:
 
 - GPU/CPU node management
 - Reservation system with calendar
@@ -231,7 +231,7 @@ The plugin (from https://github.com/christophernhill/cf-orcd-rental) adds:
 - Activity logging
 - Custom dashboard
 
-**Version Configuration:** The plugin version is specified in `config/deployment.conf` (default: v0.1). Check the [plugin repository](https://github.com/christophernhill/cf-orcd-rental/tags) for available versions.
+**Version Configuration:** The plugin version is specified in `config/deployment.conf` (default: v0.1). Check the [plugin repository](https://github.com/mit-orcd/cf-orcd-rental/tags) for available versions.
 
 ### Globus OIDC Authentication
 
