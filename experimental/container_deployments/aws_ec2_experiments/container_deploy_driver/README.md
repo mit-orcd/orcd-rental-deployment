@@ -4,11 +4,23 @@ This directory contains scripts for automated deployment of the ColdFront ORCD R
 
 ## Prerequisites
 
-1. **Running Apptainer container** with systemd support:
+1. **Running Apptainer container** with systemd and network support. The container must be started with this specific command:
    ```bash
-   # From the project root
-   ./scripts/start.sh
+   apptainer instance start \
+       --boot \
+       --writable-tmpfs \
+       --net \
+       --network my_bridge \
+       --network-args "IP=10.22.0.8" \
+       -B /sys/fs/cgroup \
+       /home/ec2-user/amazonlinux-systemd.sif devcontainer
    ```
+   
+   **Important**: The `deploy-coldfront.sh` script requires the container to be started with these options:
+   - `--boot` enables systemd inside the container
+   - `--writable-tmpfs` allows writes to the container filesystem
+   - `--net --network my_bridge` provides network connectivity
+   - The instance name `devcontainer` must match your config
 
 2. **Network connectivity** configured (port 80 and 443 forwarded):
    ```bash
