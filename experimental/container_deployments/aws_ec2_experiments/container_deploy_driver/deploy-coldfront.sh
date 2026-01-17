@@ -5,7 +5,13 @@
 # This script automates the full deployment of ColdFront with the ORCD Rental
 # plugin inside an Apptainer container.
 #
-# Usage: ./deploy-coldfront.sh [config.yaml]
+# Usage: ./deploy-coldfront.sh [OPTIONS] [config.yaml]
+#
+# Options:
+#   --skip-prereqs    Skip install_prereqs.sh (nginx/SSL setup). Use this if
+#                     SSL certs are already configured to avoid Let's Encrypt
+#                     rate limiting. The script will verify certs exist.
+#   -h, --help        Show this help message
 #
 # Prerequisites:
 # - Running Apptainer container (use ../../../scripts/start.sh)
@@ -15,7 +21,54 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CONFIG_FILE="${1:-${SCRIPT_DIR}/config/deploy-config.yaml}"
+CONFIG_FILE=""
+SKIP_PREREQS=false
+
+# =============================================================================
+# Argument Parsing
+# =============================================================================
+
+show_help() {
+    echo "Usage: $0 [OPTIONS] [config.yaml]"
+    echo ""
+    echo "Options:"
+    echo "  --skip-prereqs    Skip install_prereqs.sh (nginx/SSL setup)"
+    echo "                    Use if SSL certs are already configured"
+    echo "  -h, --help        Show this help message"
+    echo ""
+    echo "If config.yaml is not specified, defaults to:"
+    echo "  config/deploy-config.yaml"
+}
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --skip-prereqs)
+                SKIP_PREREQS=true
+                shift
+                ;;
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            -*)
+                echo "Unknown option: $1"
+                show_help
+                exit 1
+                ;;
+            *)
+                # Assume it's the config file
+                CONFIG_FILE="$1"
+                shift
+                ;;
+        esac
+    done
+    
+    # Default config file if not specified
+    if [ -z "$CONFIG_FILE" ]; then
+        CONFIG_FILE="${SCRIPT_DIR}/config/deploy-config.yaml"
+    fi
+}
 
 # Colors for output
 RED='\033[0;31m'
@@ -348,13 +401,53 @@ configure_plugin_version() {
 phase1_prereqs() {
     log_section "Section 4: Phase 1 - Installing Prerequisites"
     
-    log_info "Running install_prereqs.sh"
-    log_info "  Domain: $DOMAIN"
-    log_info "  Email: $EMAIL"
-    
-    container_exec_user "cd ~/orcd-rental-deployment && sudo ./scripts/install_prereqs.sh --domain $DOMAIN --email $EMAIL"
-    
-    log_success "Phase 1 complete: Nginx and HTTPS configured"
+    if [ "$SKIP_PREREQS" = true ]; then
+        log_warn "Skipping install_prereqs.sh (--skip-prereqs flag set)"
+        log_info "Verifying existing SSL certificate for $DOMAIN..."
+        
+        # Check if Let's Encrypt cert exists for the domain
+        local cert_path="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
+        if container_exec "test -f $cert_path"; then
+            log_success "SSL certificate found: $cert_path"
+            
+            # Check cert expiry
+            local expiry
+            expiry=$(container_exec "openssl x509 -enddate -noout -in $cert_path 2>/dev/null | cut -d= -f2" || echo "unknown")
+            log_info "Certificate expires: $expiry"
+            
+            # Verify cert is not expired
+            if container_exec "openssl x509 -checkend 86400 -noout -in $cert_path" 2>/dev/null; then
+                log_success "Certificate is valid (not expiring within 24 hours)"
+            else
+                log_warn "Certificate may be expired or expiring soon!"
+                log_warn "Consider running without --skip-prereqs to renew"
+            fi
+        else
+            log_error "SSL certificate not found: $cert_path"
+            log_error "Cannot skip prereqs - no valid certificate exists"
+            log_info "Run without --skip-prereqs to set up SSL certificates"
+            exit 1
+        fi
+        
+        # Verify nginx is installed and running
+        if container_exec "systemctl is-active nginx" 2>/dev/null | grep -q active; then
+            log_success "Nginx is running"
+        else
+            log_error "Nginx is not running"
+            log_info "Run without --skip-prereqs to install and configure nginx"
+            exit 1
+        fi
+        
+        log_success "Phase 1 skipped: Existing SSL and nginx configuration verified"
+    else
+        log_info "Running install_prereqs.sh"
+        log_info "  Domain: $DOMAIN"
+        log_info "  Email: $EMAIL"
+        
+        container_exec_user "cd ~/orcd-rental-deployment && sudo ./scripts/install_prereqs.sh --domain $DOMAIN --email $EMAIL"
+        
+        log_success "Phase 1 complete: Nginx and HTTPS configured"
+    fi
 }
 
 # =============================================================================
@@ -565,6 +658,9 @@ main() {
     echo ""
     log_info "Starting automated deployment..."
     log_info "Config file: $CONFIG_FILE"
+    if [ "$SKIP_PREREQS" = true ]; then
+        log_info "Mode: Skipping prerequisites (--skip-prereqs)"
+    fi
     
     # Verify container is running
     if ! apptainer instance list | grep -q "$INSTANCE_NAME"; then
@@ -592,4 +688,8 @@ main() {
 # Run Main
 # =============================================================================
 
-main "$@"
+# Parse command-line arguments first
+parse_args "$@"
+
+# Run the deployment
+main
