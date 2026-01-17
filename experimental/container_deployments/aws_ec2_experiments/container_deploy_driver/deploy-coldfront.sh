@@ -510,9 +510,10 @@ initialize_database() {
     
     # Activate virtualenv and set Django settings for coldfront commands
     # DJANGO_SETTINGS_MODULE=local_settings ensures the plugin is loaded
+    # PYTHONPATH must include /srv/coldfront so Python can find local_settings.py
     local venv_activate="source /srv/coldfront/venv/bin/activate"
     local coldfront_dir="cd /srv/coldfront"
-    local django_env="export DJANGO_SETTINGS_MODULE=local_settings"
+    local django_env="export DJANGO_SETTINGS_MODULE=local_settings PYTHONPATH=/srv/coldfront:\$PYTHONPATH"
     
     # Run migrations (includes plugin migrations)
     log_info "Running database migrations"
@@ -554,7 +555,7 @@ load_fixtures() {
     
     local venv_activate="source /srv/coldfront/venv/bin/activate"
     local coldfront_dir="cd /srv/coldfront"
-    local django_env="export DJANGO_SETTINGS_MODULE=local_settings"
+    local django_env="export DJANGO_SETTINGS_MODULE=local_settings PYTHONPATH=/srv/coldfront:\$PYTHONPATH"
     
     # Get the fixture directory path
     local fixture_dir="/srv/coldfront/venv/lib/python3.9/site-packages/coldfront_orcd_direct_charge/fixtures"
@@ -587,7 +588,7 @@ setup_manager_groups() {
     
     local venv_activate="source /srv/coldfront/venv/bin/activate"
     local coldfront_dir="cd /srv/coldfront"
-    local django_env="export DJANGO_SETTINGS_MODULE=local_settings"
+    local django_env="export DJANGO_SETTINGS_MODULE=local_settings PYTHONPATH=/srv/coldfront:\$PYTHONPATH"
     
     log_info "Creating rental manager group"
     container_exec_user "$coldfront_dir && $venv_activate && $django_env && coldfront setup_rental_manager --create-group" || true
