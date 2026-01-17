@@ -192,12 +192,13 @@ container_exec_user() {
 verify_container_ip_iptables() {
     log_section "Verifying Container IP and iptables Configuration"
     
-    # Get container IP address
+    # Get container IP address using ip addr (hostname -I not available in all containers)
     local container_ip
-    container_ip=$(container_exec "hostname -I" 2>/dev/null | awk '{print $1}')
+    container_ip=$(container_exec "ip addr show | grep 'inet ' | grep -v '127.0.0.1' | head -1 | awk '{print \$2}' | cut -d/ -f1" 2>/dev/null)
     
     if [ -z "$container_ip" ]; then
         log_error "Could not determine container IP address"
+        log_info "Ensure the container has network connectivity and 'ip' command available"
         exit 1
     fi
     
