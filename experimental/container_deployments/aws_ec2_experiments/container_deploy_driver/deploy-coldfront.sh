@@ -429,6 +429,14 @@ initialize_database() {
     log_info "Running coldfront initial_setup"
     container_exec_user "$coldfront_dir && $venv_activate && $django_env && echo 'yes' | coldfront initial_setup"
     
+    # Generate any missing migrations (for plugin models)
+    log_info "Generating any missing migrations"
+    container_exec_user "$coldfront_dir && $venv_activate && $django_env && coldfront makemigrations"
+    
+    # Apply newly generated migrations
+    log_info "Applying new migrations"
+    container_exec_user "$coldfront_dir && $venv_activate && $django_env && coldfront migrate"
+    
     # Create superuser non-interactively
     log_info "Creating superuser: $SUPERUSER_NAME"
     container_exec_user "$coldfront_dir && $venv_activate && $django_env && \
