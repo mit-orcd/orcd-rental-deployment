@@ -281,9 +281,76 @@ For existing deployments: No action needed. This PR only affects fresh installat
 Consistent with repository license (same as ColdFront - AGPLv3)
 
 
+# Experimental Container Deployments for AWS EC2
+
+This PR adds three experimental approaches for running ColdFront inside Apptainer containers on AWS EC2 instances. Each approach has different trade-offs and use cases.
+
+## Quick Comparison
+
+| Aspect | IP Tables Bridge | Container Deploy Driver | Systemd Override |
+|--------|------------------|------------------------|------------------|
+| Network isolation | Yes (separate namespace) | Yes (uses bridge) | No (shared with host) |
+| NAT required | Yes | Yes | No |
+| InfiniBand/IPoIB support | Limited | Limited | Full |
+| Complexity | Higher (manual iptables) | Medium (automated) | Lower (bind mounts) |
+| Multiple containers | Easy (each gets own IP) | Easy | Harder (port conflicts) |
+| Automation level | Manual scripts | Fully automated | Manual |
+
 ---
 
-# Addition of Scripted Deployment for IP Tables Container Approach
+# 1. IP Tables Bridge Approach
+
+**Directory:** [`experimental/container_deployments/aws_ec2_experiments/iptables_bridge_approach/`](experimental/container_deployments/aws_ec2_experiments/iptables_bridge_approach/)
+
+## Overview
+
+This approach runs ColdFront inside a systemd-enabled Apptainer container with an isolated network namespace and iptables-based NAT. It uses Apptainer's default `--boot` behavior with a CNI bridge network.
+
+## Architecture
+
+- Container runs in its own network namespace with a CNI bridge (`sbr0`, subnet `10.22.0.0/16`)
+- systemd runs as PID 1 inside the container (`--boot`)
+- Host iptables rules provide:
+  - Outbound NAT (MASQUERADE) for internet access
+  - Inbound DNAT (port forwarding) for service ports (80, 443)
+  - MSS clamping to prevent TCP stalls
+- Changes are ephemeral (`--writable-tmpfs`) — good for iterative development
+
+## Key Components
+
+| Script | Description |
+|--------|-------------|
+| `scripts/host-setup.sh` | Install Apptainer on the host (one-time) |
+| `scripts/build.sh` | Build container image from definition |
+| `scripts/setup-networking.sh` | Configure iptables NAT and forwarding rules |
+| `scripts/start.sh` | Start a container instance |
+| `scripts/stop.sh` | Stop a container instance |
+| `scripts/shell.sh` | Attach interactive shell |
+| `scripts/status.sh` | Check container status |
+| `scripts/teardown.sh` | Full cleanup |
+| `scripts/rebuild.sh` | Teardown + rebuild + start |
+
+## When to Use
+
+- You want full network isolation between container and host
+- You're comfortable managing iptables rules
+- You need to run multiple containers with different network configurations
+- Each container needs its own IP address
+
+## Key Technical Notes
+
+- **Isolated network**: Container has its own network namespace; iptables on the host handles routing
+- **cgroup mount**: `-B /sys/fs/cgroup` is required for systemd to manage services
+- **Ephemeral storage**: `--writable-tmpfs` means all changes are lost when the container stops
+- **Checksum offloading**: Setup script disables offloading on virtual interfaces to prevent packet corruption
+
+See [iptables_bridge_approach/docs/HOST_SETTINGS.md](experimental/container_deployments/aws_ec2_experiments/iptables_bridge_approach/docs/HOST_SETTINGS.md) for detailed networking documentation.
+
+---
+
+# 2. Container Deploy Driver (Automated Deployment Script)
+
+**Directory:** [`experimental/container_deployments/aws_ec2_experiments/container_deploy_driver/`](experimental/container_deployments/aws_ec2_experiments/container_deploy_driver/)
 
 ## Overview
 
@@ -540,3 +607,99 @@ The `set -a` makes all variables automatically exported.
 2. Container must be started with specific apptainer options
 3. iptables rules must be pre-configured on host
 4. Let's Encrypt rate limits may block new SSL certs after multiple attempts
+
+---
+
+# 3. Systemd Override Approach
+
+**Directory:** [`experimental/container_deployments/aws_ec2_experiments/systemd_override_approach/`](experimental/container_deployments/aws_ec2_experiments/systemd_override_approach/)
+
+## Overview
+
+This approach shares the host network namespace with a booted Apptainer container by using systemd drop-in overrides to prevent container-side network managers from modifying the host stack.
+
+## Background
+
+Apptainer's `--boot` flag starts a full init (systemd) as PID 1 inside an instance. Normally, systemd will try to manage networking (systemd-networkd, resolved, NetworkManager, DHCP clients, firewall helpers). Without isolation, those services could modify the host stack: bringing interfaces up/down, changing IP/route/MTU, tweaking iptables/nftables, rewriting `/etc/resolv.conf`, or racing with host DHCP/firewall daemons.
+
+For safety, Apptainer's launcher forces a separate network namespace when using `--boot`. However, there are legitimate use cases where you need to share the host network:
+- InfiniBand/IPoIB deployments where network devices aren't namespaced
+- Simpler networking without NAT overhead
+- Services that need to bind directly to host IPs
+
+## Key Techniques
+
+### Option 1: Join Host Network Namespace (Root Only)
+
+```bash
+apptainer instance start --boot --netns-path /proc/1/ns/net myimg.sif myinst
+```
+
+This joins the booted instance to the host network namespace, skipping CNI bridge creation.
+
+### Option 2: Mask Network Managers Inside Container
+
+Disable service units that would touch network interfaces:
+
+```bash
+systemctl mask systemd-networkd.service systemd-networkd.socket
+systemctl mask systemd-resolved.service
+systemctl mask NetworkManager.service
+```
+
+The `systemd_override_approach/network-overrides/` directory contains ready-to-use override files.
+
+## Risks of Sharing Host Network
+
+When sharing the host network with a systemd container, be aware of these risks:
+
+| Risk | Description |
+|------|-------------|
+| Interface reconfiguration | systemd-networkd / NetworkManager can alter IPs, routes, MTU |
+| Firewall changes | firewalld, nftables/iptables units can mutate host rules |
+| Name resolution | systemd-resolved can overwrite host `/etc/resolv.conf` |
+| Port conflicts | Container daemons may bind host ports, conflicting with host services |
+| Security surface | Root-in-container on host net can perform raw sockets, packet capture |
+
+## InfiniBand/IPoIB Considerations
+
+- **Native RDMA:** RDMA devices are not namespaced; they are effectively shared regardless of namespace choice
+- **IPoIB:** systemd-networkd or NetworkManager inside the container can reconfigure `ib*` links (MTU, P_Key, IP addresses)
+- **Recommendation:** Mask network services when joining the host network with InfiniBand
+
+## When to Use
+
+- You need direct access to host network interfaces (especially InfiniBand/IPoIB)
+- You want simpler networking without NAT complexity
+- Services need to bind directly to host IPs
+- You're comfortable masking network services to prevent host disruption
+
+## Practical Recipes
+
+**Safe default boot (isolated):**
+```bash
+apptainer instance start --boot myimg.sif myinst
+```
+
+**Share host network (root):**
+```bash
+# First, mask network managers in the image
+apptainer instance start --boot --netns-path /proc/1/ns/net myimg.sif myinst
+```
+
+**IB/IPoIB with host net:** Same as above, plus ensure IB drivers are present on host and avoid starting any network managers in the container.
+
+## Related Documentation
+
+- [systemd_override_approach/network-overrides/README.md](experimental/container_deployments/aws_ec2_experiments/systemd_override_approach/network-overrides/README.md) - Ready-to-use override files
+- [Apptainer network namespace validation in source](https://github.com/apptainer/apptainer) - `internal/pkg/runtime/engine/apptainer/prepare_linux.go`
+- [Systemd Container Interface](https://www.freedesktop.org/wiki/Software/systemd/ContainerInterface/) - Background on systemd in containers
+
+---
+
+## See Also
+
+- **Main directory README:** [experimental/container_deployments/aws_ec2_experiments/README.md](experimental/container_deployments/aws_ec2_experiments/README.md)
+- **IP Tables Approach:** [iptables_bridge_approach/README.md](experimental/container_deployments/aws_ec2_experiments/iptables_bridge_approach/README.md)
+- **Systemd Override Approach:** [systemd_override_approach/README.md](experimental/container_deployments/aws_ec2_experiments/systemd_override_approach/README.md)
+- **Container Deploy Driver:** [container_deploy_driver/README.md](experimental/container_deployments/aws_ec2_experiments/container_deploy_driver/README.md)
