@@ -171,13 +171,15 @@ load_config() {
 # =============================================================================
 
 # Execute command in container as root
+# Uses --pwd /root to avoid "no such file or directory" warnings when
+# the host's current directory doesn't exist inside the container
 container_exec() {
-    apptainer exec instance://"$INSTANCE_NAME" bash -c "$1"
+    apptainer exec --pwd /root instance://"$INSTANCE_NAME" bash -c "$1"
 }
 
 # Execute command in container as service user
 container_exec_user() {
-    apptainer exec instance://"$INSTANCE_NAME" su -l "$SERVICE_USER" -c "$1"
+    apptainer exec --pwd /tmp instance://"$INSTANCE_NAME" su -l "$SERVICE_USER" -c "$1"
 }
 
 # =============================================================================
