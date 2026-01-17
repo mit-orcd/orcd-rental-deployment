@@ -183,6 +183,78 @@ container_exec_user() {
 }
 
 # =============================================================================
+# Verify Container IP Matches iptables DNAT Rules
+# =============================================================================
+# Checks that the container's IP address matches the DNAT destination in
+# iptables rules for ports 80 and 443. This ensures traffic will be properly
+# forwarded to the container.
+
+verify_container_ip_iptables() {
+    log_section "Verifying Container IP and iptables Configuration"
+    
+    # Get container IP address
+    local container_ip
+    container_ip=$(container_exec "hostname -I" 2>/dev/null | awk '{print $1}')
+    
+    if [ -z "$container_ip" ]; then
+        log_error "Could not determine container IP address"
+        exit 1
+    fi
+    
+    log_info "Container IP address: $container_ip"
+    
+    # Check iptables DNAT rules for ports 80 and 443
+    local iptables_output
+    iptables_output=$(sudo iptables-save 2>/dev/null)
+    
+    if [ -z "$iptables_output" ]; then
+        log_warn "Could not read iptables rules (may need sudo)"
+        log_warn "Skipping iptables verification"
+        return 0
+    fi
+    
+    # Extract DNAT destination IPs for ports 80 and 443
+    local dnat_80 dnat_443
+    dnat_80=$(echo "$iptables_output" | grep -E "DNAT.*--dport 80" | grep -oE "\-\-to\-destination [0-9.]+" | awk '{print $2}' | cut -d: -f1 | head -1)
+    dnat_443=$(echo "$iptables_output" | grep -E "DNAT.*--dport 443" | grep -oE "\-\-to\-destination [0-9.]+" | awk '{print $2}' | cut -d: -f1 | head -1)
+    
+    local has_error=false
+    
+    if [ -z "$dnat_80" ]; then
+        log_error "No iptables DNAT rule found for port 80"
+        log_info "Run: sudo iptables -t nat -A PREROUTING -i <interface> -p tcp --dport 80 -j DNAT --to-destination $container_ip:80"
+        has_error=true
+    elif [ "$dnat_80" != "$container_ip" ]; then
+        log_error "iptables DNAT for port 80 points to $dnat_80, but container IP is $container_ip"
+        has_error=true
+    else
+        log_success "Port 80 DNAT correctly points to container ($dnat_80)"
+    fi
+    
+    if [ -z "$dnat_443" ]; then
+        log_error "No iptables DNAT rule found for port 443"
+        log_info "Run: sudo iptables -t nat -A PREROUTING -i <interface> -p tcp --dport 443 -j DNAT --to-destination $container_ip:443"
+        has_error=true
+    elif [ "$dnat_443" != "$container_ip" ]; then
+        log_error "iptables DNAT for port 443 points to $dnat_443, but container IP is $container_ip"
+        has_error=true
+    else
+        log_success "Port 443 DNAT correctly points to container ($dnat_443)"
+    fi
+    
+    if [ "$has_error" = true ]; then
+        log_error "Container IP does not match iptables DNAT rules"
+        log_info "Either update iptables rules to point to $container_ip"
+        log_info "Or restart the container with --network-args \"IP=$dnat_80\""
+        log_info ""
+        log_info "To view current iptables rules: sudo iptables-save | grep DNAT"
+        exit 1
+    fi
+    
+    log_success "Container IP matches iptables DNAT configuration"
+}
+
+# =============================================================================
 # Section 1: Setup Container User
 # =============================================================================
 
@@ -466,11 +538,12 @@ main() {
     # Verify container is running
     if ! apptainer instance list | grep -q "$INSTANCE_NAME"; then
         log_error "Container instance '$INSTANCE_NAME' is not running"
-        log_info "Start it with: ./scripts/start.sh"
+        log_info "Start it with the apptainer instance start command (see README.md)"
         exit 1
     fi
     
     load_config
+    verify_container_ip_iptables
     setup_container_user
     clone_deployment_repo
     configure_plugin_version

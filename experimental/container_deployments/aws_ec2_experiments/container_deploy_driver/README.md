@@ -11,7 +11,7 @@ This directory contains scripts for automated deployment of the ColdFront ORCD R
        --writable-tmpfs \
        --net \
        --network my_bridge \
-       --network-args "IP=10.22.0.8" \
+       --network-args "IP=10.22.0.2" \
        -B /sys/fs/cgroup \
        /home/ec2-user/amazonlinux-systemd.sif devcontainer
    ```
@@ -26,6 +26,19 @@ This directory contains scripts for automated deployment of the ColdFront ORCD R
    ```bash
    sudo ./scripts/setup-networking.sh
    ```
+   
+   **Critical**: The container IP address (set via `--network-args "IP=..."`) must match the iptables DNAT rules that forward ports 80 and 443. You can verify the expected IP by checking your iptables configuration:
+   ```bash
+   sudo iptables-save | grep DNAT
+   ```
+   
+   Example output showing the container should use IP `10.22.0.2`:
+   ```
+   -A PREROUTING -i enX0 -p tcp -m tcp --dport 80 -j DNAT --to-destination 10.22.0.2:80
+   -A PREROUTING -i enX0 -p tcp -m tcp --dport 443 -j DNAT --to-destination 10.22.0.2:443
+   ```
+   
+   The `deploy-coldfront.sh` script will verify this match and fail with an error if the container IP doesn't match the iptables DNAT destination.
 
 3. **DNS configured** for your domain pointing to your host's public IP
 
