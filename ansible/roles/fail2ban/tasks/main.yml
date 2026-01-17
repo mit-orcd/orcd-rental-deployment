@@ -33,8 +33,8 @@
     daemon_reload: true
 
 - name: Wait for fail2ban to initialize
-  ansible.builtin.pause:
-    seconds: 3
+  ansible.builtin.command: sleep 3
+  changed_when: false
 
 - name: Get fail2ban status
   ansible.builtin.command: fail2ban-client status
