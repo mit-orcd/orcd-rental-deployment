@@ -215,9 +215,10 @@ verify_container_ip_iptables() {
     fi
     
     # Extract DNAT destination IPs for ports 80 and 443
+    # Use sed to extract IP from --to-destination IP:PORT
     local dnat_80 dnat_443
-    dnat_80=$(echo "$iptables_output" | grep -E "DNAT.*--dport 80" | grep -oE "\-\-to\-destination [0-9.]+" | awk '{print $2}' | cut -d: -f1 | head -1)
-    dnat_443=$(echo "$iptables_output" | grep -E "DNAT.*--dport 443" | grep -oE "\-\-to\-destination [0-9.]+" | awk '{print $2}' | cut -d: -f1 | head -1)
+    dnat_80=$(echo "$iptables_output" | grep "DNAT" | grep "dport 80" | sed -n 's/.*--to-destination \([0-9.]*\).*/\1/p' | head -1)
+    dnat_443=$(echo "$iptables_output" | grep "DNAT" | grep "dport 443" | sed -n 's/.*--to-destination \([0-9.]*\).*/\1/p' | head -1)
     
     local has_error=false
     
