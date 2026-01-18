@@ -33,6 +33,15 @@ globus:
 plugin_version: "main"
 
 # =============================================================================
+# Deployment Repository Settings
+# =============================================================================
+# Branch/tag of orcd-rental-deployment to clone inside the container.
+# If not specified, defaults to the current branch/tag of the host checkout.
+# Use "main" for stable, or a specific tag like "v1.0"
+# =============================================================================
+# deployment_repo_version: "main"
+
+# =============================================================================
 # Container Settings
 # =============================================================================
 container:

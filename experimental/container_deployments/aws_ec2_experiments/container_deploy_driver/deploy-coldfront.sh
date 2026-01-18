@@ -77,6 +77,41 @@ parse_args() {
 # are now provided by deploy-utils.sh
 
 # =============================================================================
+# Detect Host Repository Version
+# =============================================================================
+# Determines the current git branch/tag of the orcd-rental-deployment repo
+# on the host machine. Used as default when deployment_repo_version is not set.
+
+get_host_repo_version() {
+    local repo_dir="$1"
+    local version
+    
+    # Try to get exact tag first
+    version=$(git -C "$repo_dir" describe --tags --exact-match 2>/dev/null)
+    if [ -n "$version" ]; then
+        echo "$version"
+        return 0
+    fi
+    
+    # Fall back to current branch name
+    version=$(git -C "$repo_dir" rev-parse --abbrev-ref HEAD 2>/dev/null)
+    if [ -n "$version" ] && [ "$version" != "HEAD" ]; then
+        echo "$version"
+        return 0
+    fi
+    
+    # Fall back to short SHA (for detached HEAD state)
+    version=$(git -C "$repo_dir" rev-parse --short HEAD 2>/dev/null)
+    if [ -n "$version" ]; then
+        echo "$version"
+        return 0
+    fi
+    
+    # Ultimate fallback
+    echo "main"
+}
+
+# =============================================================================
 # Load Configuration
 # =============================================================================
 
@@ -106,6 +141,14 @@ load_config() {
     INSTANCE_NAME="${CFG_container_instance_name:-devcontainer}"
     SERVICE_USER="${CFG_container_service_user:-ec2-user}"
     
+    # Deployment repo version - use config value or detect from host checkout
+    if [ -n "${CFG_deployment_repo_version:-}" ]; then
+        DEPLOYMENT_REPO_VERSION="${CFG_deployment_repo_version}"
+    else
+        # Detect from the host's orcd-rental-deployment checkout
+        DEPLOYMENT_REPO_VERSION=$(get_host_repo_version "$SCRIPT_DIR")
+    fi
+    
     # Validate required fields
     local missing=""
     [ -z "$DOMAIN" ] && missing="$missing domain"
@@ -125,6 +168,7 @@ load_config() {
     log_info "  Instance: $INSTANCE_NAME"
     log_info "  Service User: $SERVICE_USER"
     log_info "  Plugin Version: $PLUGIN_VERSION"
+    log_info "  Deployment Repo Version: $DEPLOYMENT_REPO_VERSION"
 }
 
 # =============================================================================
@@ -243,19 +287,18 @@ clone_deployment_repo() {
     log_section "Section 2: Cloning Deployment Repository"
     
     local repo_url="https://github.com/mit-orcd/orcd-rental-deployment.git"
-    local repo_branch="cnh/container-deployment-experiments"
     local repo_dir="/home/$SERVICE_USER/orcd-rental-deployment"
     
     # Check if already cloned
     if container_exec_user "test -d $repo_dir"; then
         log_info "Repository already exists, updating..."
-        container_exec_user "cd $repo_dir && git fetch origin && git checkout $repo_branch && git pull origin $repo_branch"
+        container_exec_user "cd $repo_dir && git fetch origin && git checkout $DEPLOYMENT_REPO_VERSION && git pull origin $DEPLOYMENT_REPO_VERSION"
     else
-        log_info "Cloning orcd-rental-deployment repository (branch: $repo_branch)"
-        container_exec_user "cd ~ && git clone --branch $repo_branch $repo_url"
+        log_info "Cloning orcd-rental-deployment repository (version: $DEPLOYMENT_REPO_VERSION)"
+        container_exec_user "cd ~ && git clone --branch $DEPLOYMENT_REPO_VERSION $repo_url"
     fi
     
-    log_success "Repository ready at $repo_dir (branch: $repo_branch)"
+    log_success "Repository ready at $repo_dir (version: $DEPLOYMENT_REPO_VERSION)"
 }
 
 # =============================================================================
