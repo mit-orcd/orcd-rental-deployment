@@ -26,6 +26,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_FILE=""
 DRY_RUN=false
 
+# Note: We source deploy-utils.sh AFTER parse_args so DRY_RUN is set first
+
 # =============================================================================
 # Argument Parsing
 # =============================================================================
@@ -79,101 +81,8 @@ parse_args() {
     fi
 }
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
-# =============================================================================
-# Logging Functions
-# =============================================================================
-
-log_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
-
-log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-log_section() {
-    echo ""
-    echo "============================================================================="
-    echo -e "${GREEN}$1${NC}"
-    echo "============================================================================="
-}
-
-# =============================================================================
-# YAML Parser Function (copied from deploy-coldfront.sh)
-# =============================================================================
-
-parse_yaml() {
-    local yaml_file="$1"
-    local prefix="${2:-}"
-    
-    if [ ! -f "$yaml_file" ]; then
-        log_error "Config file not found: $yaml_file"
-        exit 1
-    fi
-    
-    # Parse simple key: value pairs
-    while IFS= read -r line; do
-        # Skip comments and empty lines
-        [[ "$line" =~ ^[[:space:]]*# ]] && continue
-        [[ -z "$line" ]] && continue
-        
-        # Match top-level key: value (no leading whitespace)
-        if [[ "$line" =~ ^([a-zA-Z_][a-zA-Z0-9_]*)[[:space:]]*:[[:space:]]*\"?([^\"]*)\"?$ ]]; then
-            key="${BASH_REMATCH[1]}"
-            value="${BASH_REMATCH[2]}"
-            # Trim trailing whitespace and quotes
-            value=$(echo "$value" | sed 's/[[:space:]]*$//' | sed 's/^"//' | sed 's/"$//')
-            if [ -n "$value" ]; then
-                printf '%s%s="%s"\n' "$prefix" "$key" "$value"
-            fi
-        fi
-    done < "$yaml_file"
-    
-    # Parse nested values (one level deep)
-    local current_section=""
-    while IFS= read -r line; do
-        # Skip comments
-        [[ "$line" =~ ^[[:space:]]*# ]] && continue
-        
-        # Match section header (key with no value, followed by indented items)
-        if [[ "$line" =~ ^([a-zA-Z_][a-zA-Z0-9_]*)[[:space:]]*:[[:space:]]*$ ]]; then
-            current_section="${BASH_REMATCH[1]}"
-            continue
-        fi
-        
-        # Match indented key: value under a section
-        if [[ "$line" =~ ^[[:space:]]+([a-zA-Z_][a-zA-Z0-9_]*)[[:space:]]*:[[:space:]]*\"?([^\"]*)\"?$ ]]; then
-            if [ -n "$current_section" ]; then
-                key="${BASH_REMATCH[1]}"
-                value="${BASH_REMATCH[2]}"
-                value=$(echo "$value" | sed 's/[[:space:]]*$//' | sed 's/^"//' | sed 's/"$//')
-                if [ -n "$value" ]; then
-                    printf '%s%s_%s="%s"\n' "$prefix" "$current_section" "$key" "$value"
-                fi
-            fi
-        fi
-        
-        # Reset section when we hit a non-indented line
-        if [[ "$line" =~ ^[a-zA-Z] ]]; then
-            current_section=""
-        fi
-    done < "$yaml_file"
-}
+# Note: Colors, logging functions, parse_yaml, and container helpers
+# are provided by deploy-utils.sh (sourced after argument parsing)
 
 # =============================================================================
 # Load Configuration
@@ -215,18 +124,7 @@ load_config() {
     log_info "  Service User: $SERVICE_USER"
 }
 
-# =============================================================================
-# Container Execution Helper
-# =============================================================================
-
-# Execute command in container as service user
-container_exec_user() {
-    if [ "$DRY_RUN" = true ]; then
-        log_info "[DRY-RUN] Would execute: $1"
-        return 0
-    fi
-    apptainer exec --pwd /tmp instance://"$INSTANCE_NAME" su -l "$SERVICE_USER" -c "$1"
-}
+# Note: container_exec_user is provided by deploy-utils.sh (with DRY_RUN support)
 
 # =============================================================================
 # Create User Function
@@ -256,8 +154,9 @@ else:
     # Escape single quotes for shell
     python_cmd=$(echo "$python_cmd" | sed "s/'/\\\\'/g")
     
-    # Build the full command with Django environment
-    local coldfront_env="cd /srv/coldfront && source venv/bin/activate && set -a && source coldfront.env && set +a && export DJANGO_SETTINGS_MODULE=local_settings PYTHONPATH=/srv/coldfront:\$PYTHONPATH"
+    # Get ColdFront environment from utils
+    local coldfront_env
+    coldfront_env=$(get_coldfront_env)
     
     if [ "$DRY_RUN" = true ]; then
         log_info "[DRY-RUN] Would create user: $username with email: $email"
@@ -289,7 +188,9 @@ assign_role() {
     
     log_info "Assigning $role_name role to: $username"
     
-    local coldfront_env="cd /srv/coldfront && source venv/bin/activate && set -a && source coldfront.env && set +a && export DJANGO_SETTINGS_MODULE=local_settings PYTHONPATH=/srv/coldfront:\$PYTHONPATH"
+    # Get ColdFront environment from utils
+    local coldfront_env
+    coldfront_env=$(get_coldfront_env)
     
     if [ "$DRY_RUN" = true ]; then
         log_info "[DRY-RUN] Would run: coldfront $role_command --add-user $username"
@@ -313,13 +214,9 @@ main() {
     log_info "This script creates service accounts for CI/CD, testing, and demos."
     log_info "Config file: $CONFIG_FILE"
     
-    # Verify container is running
-    if [ "$DRY_RUN" = false ]; then
-        if ! apptainer instance list | grep -q "$INSTANCE_NAME"; then
-            log_error "Container instance '$INSTANCE_NAME' is not running"
-            log_info "Start it with the apptainer instance start command"
-            exit 1
-        fi
+    # Verify container is running (respects DRY_RUN)
+    if ! verify_container_running; then
+        exit 1
     fi
     
     load_config
@@ -375,8 +272,12 @@ main() {
 # Run Main
 # =============================================================================
 
-# Parse command-line arguments first
+# Parse command-line arguments first (sets DRY_RUN if --dry-run passed)
 parse_args "$@"
+
+# Source shared utilities AFTER parse_args so DRY_RUN is set
+# This makes container_exec_user respect the --dry-run flag
+source "${SCRIPT_DIR}/deploy-utils.sh"
 
 # Run the script
 main

@@ -1,17 +1,47 @@
-# Add Service Accounts Creation Script
+# Add Service Accounts Script and Refactor Shared Utilities
 
 ## Summary
 
-This PR adds a new script `create-service-accounts.sh` to provision service accounts for CI/CD, testing, training, demos, and documentation purposes.
+This PR:
+1. Adds a new script `create-service-accounts.sh` to provision service accounts for CI/CD, testing, training, demos, and documentation
+2. Refactors common code from `deploy-coldfront.sh` into a shared `deploy-utils.sh` file
 
 ## Motivation
 
 When setting up test or demo environments for the ColdFront ORCD Rental Portal, it's helpful to have pre-configured accounts with appropriate roles. Rather than manually creating these accounts each time, this script automates the process using the existing deployment configuration.
 
+During development, significant code duplication was identified between deployment scripts. This refactoring extracts ~100 lines of shared functionality into a reusable utilities file.
+
 ## Changes
 
-### New File
-- `experimental/container_deployments/aws_ec2_experiments/container_deploy_driver/create-service-accounts.sh`
+### New Files
+- `experimental/container_deployments/aws_ec2_experiments/container_deploy_driver/deploy-utils.sh` - Shared utilities
+- `experimental/container_deployments/aws_ec2_experiments/container_deploy_driver/create-service-accounts.sh` - Service accounts script
+
+### Modified Files
+- `experimental/container_deployments/aws_ec2_experiments/container_deploy_driver/deploy-coldfront.sh` - Now sources `deploy-utils.sh`
+
+## Shared Utilities (deploy-utils.sh)
+
+The following functions are now shared between scripts:
+
+| Function | Description |
+|----------|-------------|
+| `log_info()`, `log_success()`, `log_warn()`, `log_error()` | Colored logging |
+| `log_section()` | Section headers with separators |
+| `parse_yaml()` | YAML config file parser |
+| `container_exec()` | Execute command in container as root |
+| `container_exec_user()` | Execute command in container as service user |
+| `verify_container_running()` | Check if Apptainer instance is running |
+| `get_coldfront_env()` | Get Django environment setup string |
+| `run_coldfront_command()` | Run ColdFront management commands |
+| `load_base_config()` | Load and validate base configuration |
+
+### DRY_RUN Support
+
+Container execution functions respect a global `DRY_RUN` variable:
+- When `DRY_RUN=true`, commands are logged but not executed
+- This enables `--dry-run` mode in scripts like `create-service-accounts.sh`
 
 ### Accounts Created
 
