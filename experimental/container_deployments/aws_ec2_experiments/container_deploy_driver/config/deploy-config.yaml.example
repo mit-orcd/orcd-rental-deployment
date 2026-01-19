@@ -49,3 +49,17 @@ container:
   instance_name: "devcontainer"
   # User account to create inside the container
   service_user: "ec2-user"
+
+# =============================================================================
+# Certificate Persistence (Informational)
+# =============================================================================
+# To persist Let's Encrypt certificates across container restarts and avoid
+# rate limits, start the container with a bind mount:
+#   -B /srv/letsencrypt:/etc/letsencrypt
+#
+# The start.sh script enables this by default. Set CERT_PERSIST_DIR="" to disable.
+# 
+# After initial deployment, use --skip-prereqs flag to skip certificate
+# acquisition and reuse existing certificates:
+#   ./deploy-coldfront.sh --skip-prereqs config/deploy-config.yaml
+# =============================================================================

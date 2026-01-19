@@ -246,6 +246,29 @@ verify_container_ip_iptables() {
 }
 
 # =============================================================================
+# Verify Certificate Persistence
+# =============================================================================
+# Checks if /etc/letsencrypt is bind-mounted (persistent) or ephemeral.
+# This is informational - warns user if certs will be lost on container restart.
+
+verify_cert_persistence() {
+    log_section "Checking Certificate Persistence"
+    
+    # Check if /etc/letsencrypt is a bind mount
+    if container_exec "mountpoint -q /etc/letsencrypt" 2>/dev/null; then
+        log_success "Certificate directory is bind-mounted (persistent)"
+        log_info "Certificates will survive container restarts"
+        return 0
+    else
+        log_warn "Certificate directory is NOT bind-mounted"
+        log_info "Certificates will be lost if container is recreated"
+        log_info "To persist certificates, start container with:"
+        log_info "  -B /srv/letsencrypt:/etc/letsencrypt"
+        return 1
+    fi
+}
+
+# =============================================================================
 # Section 1: Setup Container User
 # =============================================================================
 
@@ -371,6 +394,13 @@ phase1_prereqs() {
             log_error "Nginx is not running"
             log_info "Run without --skip-prereqs to install and configure nginx"
             exit 1
+        fi
+        
+        # Warn if certificates are not persisted
+        if ! container_exec "mountpoint -q /etc/letsencrypt" 2>/dev/null; then
+            log_warn "Note: /etc/letsencrypt is not a bind mount"
+            log_warn "These certificates will be lost if container is recreated"
+            log_info "Consider starting container with: -B /srv/letsencrypt:/etc/letsencrypt"
         fi
         
         log_success "Phase 1 skipped: Existing SSL and nginx configuration verified"
@@ -611,6 +641,7 @@ main() {
     
     load_config
     verify_container_ip_iptables
+    verify_cert_persistence || true  # Informational only, don't fail
     setup_container_user
     clone_deployment_repo
     configure_plugin_version
