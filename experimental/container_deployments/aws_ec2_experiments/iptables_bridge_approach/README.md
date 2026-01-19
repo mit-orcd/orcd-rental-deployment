@@ -91,6 +91,7 @@ The scripts wrap these apptainer commands. For manual control or debugging, you 
 ### Start a booted container instance
 
 ```bash
+# Basic start (ephemeral - all changes lost on container stop)
 apptainer instance start \
     --boot \
     --writable-tmpfs \
@@ -98,6 +99,18 @@ apptainer instance start \
     --network my_bridge \
     --network-args "IP=10.22.0.8" \
     -B /sys/fs/cgroup \
+    amazonlinux-systemd.sif devcontainer
+
+# With persistent certificates (recommended for production/testing)
+# First create: sudo mkdir -p /srv/letsencrypt
+apptainer instance start \
+    --boot \
+    --writable-tmpfs \
+    --net \
+    --network my_bridge \
+    --network-args "IP=10.22.0.8" \
+    -B /sys/fs/cgroup \
+    -B /srv/letsencrypt:/etc/letsencrypt \
     amazonlinux-systemd.sif devcontainer
 ```
 
@@ -107,6 +120,7 @@ Key flags:
 - `--net --network my_bridge` — Use the CNI bridge network
 - `--network-args "IP=..."` — Assign a specific IP address
 - `-B /sys/fs/cgroup` — Bind cgroup filesystem for systemd
+- `-B /srv/letsencrypt:/etc/letsencrypt` — Persist SSL certificates across restarts
 
 ### Execute a command in the running instance
 
@@ -162,6 +176,7 @@ iptables_bridge_approach/
 - **Isolated network**: Container has its own network namespace; iptables on the host handles routing.
 - **cgroup mount**: `-B /sys/fs/cgroup` is required for systemd to manage services.
 - **Ephemeral storage**: `--writable-tmpfs` means all changes are lost when the container stops. Use `--overlay` if you need persistence.
+- **Certificate persistence**: Use `-B /srv/letsencrypt:/etc/letsencrypt` to persist SSL certificates across container restarts. This avoids Let's Encrypt rate limits during development. The `start.sh` script enables this by default.
 - **Checksum offloading**: The setup script disables offloading on virtual interfaces to prevent packet corruption.
 
 ## Detailed Documentation

@@ -112,6 +112,79 @@ To get Globus credentials:
 3. Set redirect URI to: `https://YOUR_DOMAIN/oidc/callback/`
 4. Copy the Client ID and Client Secret to your config
 
+## Certificate Persistence (Avoiding Rate Limits)
+
+When using `--writable-tmpfs`, all container filesystem changes are ephemeral. This includes SSL certificates obtained from Let's Encrypt. During development and testing, repeatedly redeploying can hit Let's Encrypt rate limits (5 duplicate certs/week, 50 certs/domain/week).
+
+To persist certificates across container restarts, use a bind mount:
+
+### First-Time Setup
+
+1. Create host directory for certificates:
+   ```bash
+   sudo mkdir -p /srv/letsencrypt
+   sudo chmod 755 /srv/letsencrypt
+   ```
+
+2. Start container with certificate bind mount:
+   ```bash
+   apptainer instance start \
+       --boot \
+       --writable-tmpfs \
+       --net \
+       --network my_bridge \
+       --network-args "IP=10.22.0.2" \
+       -B /sys/fs/cgroup \
+       -B /srv/letsencrypt:/etc/letsencrypt \
+       /home/ec2-user/amazonlinux-systemd.sif devcontainer
+   ```
+
+3. Run initial deployment (obtains certificates):
+   ```bash
+   ./deploy-coldfront.sh config/deploy-config.yaml
+   ```
+
+### Subsequent Redeploys
+
+After stopping and restarting the container, certificates persist on the host:
+
+1. Stop the container:
+   ```bash
+   apptainer instance stop devcontainer
+   ```
+
+2. Start with the same bind mount:
+   ```bash
+   apptainer instance start \
+       --boot \
+       --writable-tmpfs \
+       --net \
+       --network my_bridge \
+       --network-args "IP=10.22.0.2" \
+       -B /sys/fs/cgroup \
+       -B /srv/letsencrypt:/etc/letsencrypt \
+       /home/ec2-user/amazonlinux-systemd.sif devcontainer
+   ```
+
+3. Deploy with `--skip-prereqs` to skip certificate acquisition:
+   ```bash
+   ./deploy-coldfront.sh --skip-prereqs config/deploy-config.yaml
+   ```
+
+This skips certbot (reuses existing certs) but reinstalls everything else fresh, ensuring a reproducible deployment.
+
+### Using start.sh Script
+
+If using the `iptables_bridge_approach/scripts/start.sh` script, certificate persistence is enabled by default:
+
+```bash
+# start.sh now includes -B /srv/letsencrypt:/etc/letsencrypt by default
+./scripts/start.sh
+
+# To disable certificate persistence:
+CERT_PERSIST_DIR="" ./scripts/start.sh
+```
+
 ## What Gets Deployed
 
 The script performs these steps:

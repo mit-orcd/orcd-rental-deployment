@@ -11,16 +11,38 @@ IMAGE="${PROJECT_DIR}/amazonlinux-systemd.sif"
 NETWORK_NAME="my_bridge"
 CONTAINER_IP="10.22.0.8"
 
+# Certificate persistence - bind mount host directory to preserve Let's Encrypt certs
+# Set CERT_PERSIST_DIR="" to disable certificate persistence
+CERT_PERSIST_DIR="${CERT_PERSIST_DIR:-/srv/letsencrypt}"
+
 if [ ! -f "$IMAGE" ]; then
     echo "Error: Image not found at ${IMAGE}"
     echo "Run ./scripts/build.sh first"
     exit 1
 fi
 
+# Build bind mount arguments
+BIND_ARGS="-B /sys/fs/cgroup"
+
+# Add certificate persistence bind mount if configured
+if [ -n "$CERT_PERSIST_DIR" ]; then
+    if [ ! -d "$CERT_PERSIST_DIR" ]; then
+        echo "Creating certificate persistence directory: ${CERT_PERSIST_DIR}"
+        sudo mkdir -p "$CERT_PERSIST_DIR"
+        sudo chmod 755 "$CERT_PERSIST_DIR"
+    fi
+    BIND_ARGS="${BIND_ARGS} -B ${CERT_PERSIST_DIR}:/etc/letsencrypt"
+fi
+
 echo "Starting container instance: ${CONTAINER_NAME}"
 echo "  Image:   ${IMAGE}"
 echo "  Network: ${NETWORK_NAME}"
 echo "  IP:      ${CONTAINER_IP}"
+if [ -n "$CERT_PERSIST_DIR" ]; then
+    echo "  Certs:   ${CERT_PERSIST_DIR} -> /etc/letsencrypt (persistent)"
+else
+    echo "  Certs:   ephemeral (will be lost on container stop)"
+fi
 
 apptainer instance start \
     --boot \
@@ -28,7 +50,7 @@ apptainer instance start \
     --net \
     --network "${NETWORK_NAME}" \
     --network-args "IP=${CONTAINER_IP}" \
-    -B /sys/fs/cgroup \
+    ${BIND_ARGS} \
     "$IMAGE" "$CONTAINER_NAME"
 
 echo ""
