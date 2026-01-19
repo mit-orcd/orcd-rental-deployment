@@ -24,6 +24,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_FILE=""
 SKIP_PREREQS=false
 
+# Source shared utilities (logging, yaml parsing, container helpers)
+source "${SCRIPT_DIR}/deploy-utils.sh"
+
 # =============================================================================
 # Argument Parsing
 # =============================================================================
@@ -70,103 +73,8 @@ parse_args() {
     fi
 }
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
-# =============================================================================
-# Logging Functions
-# =============================================================================
-
-log_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
-
-log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-log_section() {
-    echo ""
-    echo "============================================================================="
-    echo -e "${GREEN}$1${NC}"
-    echo "============================================================================="
-}
-
-# =============================================================================
-# YAML Parser Function
-# =============================================================================
-# Simple YAML parser for flat and one-level nested values
-# Usage: parse_yaml config.yaml "prefix_"
-
-parse_yaml() {
-    local yaml_file="$1"
-    local prefix="${2:-}"
-    
-    if [ ! -f "$yaml_file" ]; then
-        log_error "Config file not found: $yaml_file"
-        exit 1
-    fi
-    
-    # Parse simple key: value pairs
-    while IFS= read -r line; do
-        # Skip comments and empty lines
-        [[ "$line" =~ ^[[:space:]]*# ]] && continue
-        [[ -z "$line" ]] && continue
-        
-        # Match top-level key: value (no leading whitespace)
-        if [[ "$line" =~ ^([a-zA-Z_][a-zA-Z0-9_]*)[[:space:]]*:[[:space:]]*\"?([^\"]*)\"?$ ]]; then
-            key="${BASH_REMATCH[1]}"
-            value="${BASH_REMATCH[2]}"
-            # Trim trailing whitespace and quotes
-            value=$(echo "$value" | sed 's/[[:space:]]*$//' | sed 's/^"//' | sed 's/"$//')
-            if [ -n "$value" ]; then
-                printf '%s%s="%s"\n' "$prefix" "$key" "$value"
-            fi
-        fi
-    done < "$yaml_file"
-    
-    # Parse nested values (one level deep)
-    local current_section=""
-    while IFS= read -r line; do
-        # Skip comments
-        [[ "$line" =~ ^[[:space:]]*# ]] && continue
-        
-        # Match section header (key with no value, followed by indented items)
-        if [[ "$line" =~ ^([a-zA-Z_][a-zA-Z0-9_]*)[[:space:]]*:[[:space:]]*$ ]]; then
-            current_section="${BASH_REMATCH[1]}"
-            continue
-        fi
-        
-        # Match indented key: value under a section
-        if [[ "$line" =~ ^[[:space:]]+([a-zA-Z_][a-zA-Z0-9_]*)[[:space:]]*:[[:space:]]*\"?([^\"]*)\"?$ ]]; then
-            if [ -n "$current_section" ]; then
-                key="${BASH_REMATCH[1]}"
-                value="${BASH_REMATCH[2]}"
-                value=$(echo "$value" | sed 's/[[:space:]]*$//' | sed 's/^"//' | sed 's/"$//')
-                if [ -n "$value" ]; then
-                    printf '%s%s_%s="%s"\n' "$prefix" "$current_section" "$key" "$value"
-                fi
-            fi
-        fi
-        
-        # Reset section when we hit a non-indented line
-        if [[ "$line" =~ ^[a-zA-Z] ]]; then
-            current_section=""
-        fi
-    done < "$yaml_file"
-}
+# Note: Colors, logging functions, parse_yaml, and container helpers
+# are now provided by deploy-utils.sh
 
 # =============================================================================
 # Load Configuration
@@ -217,22 +125,6 @@ load_config() {
     log_info "  Instance: $INSTANCE_NAME"
     log_info "  Service User: $SERVICE_USER"
     log_info "  Plugin Version: $PLUGIN_VERSION"
-}
-
-# =============================================================================
-# Container Execution Helper
-# =============================================================================
-
-# Execute command in container as root
-# Uses --pwd /root to avoid "no such file or directory" warnings when
-# the host's current directory doesn't exist inside the container
-container_exec() {
-    apptainer exec --pwd /root instance://"$INSTANCE_NAME" bash -c "$1"
-}
-
-# Execute command in container as service user
-container_exec_user() {
-    apptainer exec --pwd /tmp instance://"$INSTANCE_NAME" su -l "$SERVICE_USER" -c "$1"
 }
 
 # =============================================================================
