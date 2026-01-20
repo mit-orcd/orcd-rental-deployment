@@ -27,6 +27,12 @@
 #   GLOBUS_CLIENT_ID     - Globus OAuth Client ID
 #   GLOBUS_CLIENT_SECRET - Globus OAuth Client Secret
 #
+# The following plugin variables are automatically included in coldfront.env
+# from the template (required for ColdFront to load rest_framework.authtoken):
+#   PLUGIN_API=True
+#   AUTO_PI_ENABLE=True
+#   AUTO_DEFAULT_PROJECT_ENABLE=True
+#
 # Prerequisites:
 #   - install_nginx_base.sh must have been run first (Nginx with HTTPS)
 #   - install.sh must have been run (ColdFront installed)
@@ -190,6 +196,11 @@ collect_inputs() {
     echo "  Client Secret: ****${OIDC_CLIENT_SECRET: -4}"
     echo "  Secret Key:    ${SECRET_KEY:0:20}..."
     echo ""
+    echo "Plugin settings (from template):"
+    echo "  PLUGIN_API=True"
+    echo "  AUTO_PI_ENABLE=True"
+    echo "  AUTO_DEFAULT_PROJECT_ENABLE=True"
+    echo ""
     
     # Skip confirmation in non-interactive mode or if all env vars were provided
     if [[ "${NON_INTERACTIVE}" == "true" ]] || check_env_vars; then
@@ -256,6 +267,8 @@ generate_coldfront_env() {
     log_info "Generating coldfront.env..."
     
     # Save a copy in secrets directory first (always works)
+    # Note: The template includes PLUGIN_API, AUTO_PI_ENABLE, and AUTO_DEFAULT_PROJECT_ENABLE
+    # These are critical for ColdFront to load rest_framework.authtoken during startup
     mkdir -p "${SECRETS_DIR}"
     sed -e "s|{{SECRET_KEY}}|${SECRET_KEY}|g" \
         -e "s|{{OIDC_CLIENT_ID}}|${OIDC_CLIENT_ID}|g" \
@@ -263,6 +276,7 @@ generate_coldfront_env() {
         "${TEMPLATE}" > "${SECRETS_COPY}"
     chmod 600 "${SECRETS_COPY}"
     log_info "Backup created: ${SECRETS_COPY}"
+    log_info "Plugin env vars included: PLUGIN_API, AUTO_PI_ENABLE, AUTO_DEFAULT_PROJECT_ENABLE"
     
     # Try to copy to app directory (may need sudo)
     if cp "${SECRETS_COPY}" "${OUTPUT}" 2>/dev/null; then
