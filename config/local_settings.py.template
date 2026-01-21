@@ -157,15 +157,20 @@ OIDC_AUTH_REQUEST_EXTRA_PARAMS = {
 # =============================================================================
 # ORCD PLUGIN SETTINGS
 # =============================================================================
-
-# Enable REST API plugin (required for ORCD plugin)
-os.environ.setdefault('PLUGIN_API', 'True')
-
-# Automatically make all users PIs (can create projects)
-os.environ.setdefault('AUTO_PI_ENABLE', 'True')
-
-# Automatically create personal and group projects for new users
-os.environ.setdefault('AUTO_DEFAULT_PROJECT_ENABLE', 'True')
+#
+# IMPORTANT: The following environment variables MUST be set in coldfront.env
+# (or exported in the shell) BEFORE Python runs, not here in local_settings.py.
+#
+# This is because ColdFront's base settings (imported on line 14) check these
+# environment variables to conditionally add apps to INSTALLED_APPS. By the time
+# this file executes, those settings have already been loaded.
+#
+# Required environment variables (set in coldfront.env):
+#   PLUGIN_API=True                  - Enables REST API plugin, adds rest_framework.authtoken
+#   AUTO_PI_ENABLE=True              - Automatically makes all users PIs (can create projects)
+#   AUTO_DEFAULT_PROJECT_ENABLE=True - Automatically creates personal/group projects for new users
+#
+# See config/coldfront.env.template for the complete list of environment variables.
 
 # =============================================================================
 # LOGGING

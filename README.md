@@ -68,14 +68,19 @@ sudo ./scripts/install_nginx_app.sh --domain YOUR_DOMAIN
 cd /srv/coldfront
 source venv/bin/activate
 
+# IMPORTANT: Environment variables MUST be set BEFORE running any Django commands.
+# These variables are read when ColdFront's settings are loaded, which determines
+# which apps are installed and which migrations run. Setting them after import has no effect.
+
 # Load secrets from environment file (required for SECRET_KEY, OIDC credentials)
+# The coldfront.env file also contains PLUGIN_API, AUTO_PI_ENABLE, and
+# AUTO_DEFAULT_PROJECT_ENABLE which enable the ORCD plugin features.
 set -a
 source /srv/coldfront/coldfront.env
 set +a
 
 export PYTHONPATH=/srv/coldfront
 export DJANGO_SETTINGS_MODULE=local_settings
-export PLUGIN_API=True AUTO_PI_ENABLE=True AUTO_DEFAULT_PROJECT_ENABLE=True
 
 coldfront migrate
 coldfront initial_setup  # Load initial reference data (answer 'yes' when prompted)
@@ -195,6 +200,13 @@ The ORCD plugin is controlled by these environment variables:
 | `AUTO_PI_ENABLE` | `False` | Auto-set users as Principal Investigators |
 | `AUTO_DEFAULT_PROJECT_ENABLE` | `False` | Auto-create personal/group projects |
 
+> **Important:** These environment variables must be set in the shell BEFORE running any Django commands (including `migrate`, `collectstatic`, `shell`, etc.). ColdFront reads these variables when its settings module is first imported. Setting them via `os.environ.setdefault()` in Python code or after importing Django settings has no effect.
+>
+> The recommended approach is to add these variables to `coldfront.env` and source it before running Django commands:
+> ```bash
+> set -a && source /srv/coldfront/coldfront.env && set +a
+> ```
+
 ## Security
 
 ### Secrets Management
@@ -271,9 +283,10 @@ sudo systemctl status coldfront
 # Run health check
 ./scripts/healthcheck.sh
 
-# Django management
+# Django management (always source coldfront.env first!)
 cd /srv/coldfront && source venv/bin/activate
-export DJANGO_SETTINGS_MODULE=local_settings PLUGIN_API=True
+set -a && source /srv/coldfront/coldfront.env && set +a
+export DJANGO_SETTINGS_MODULE=local_settings PYTHONPATH=/srv/coldfront
 coldfront migrate
 coldfront collectstatic
 coldfront shell
