@@ -1,0 +1,24 @@
+# Systemd service unit for the development container
+# 
+# To install:
+#   sudo cp config/container.service /etc/systemd/system/devcontainer.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable devcontainer
+#   sudo systemctl start devcontainer
+#
+# Note: Update the paths below to match your installation location
+
+[Unit]
+Description=Development Container (Apptainer with systemd)
+After=network.target
+
+[Service]
+Type=forking
+# Update this path to your actual installation location
+ExecStart=/path/to/iptables_bridge_approach/scripts/start.sh devcontainer
+ExecStop=/path/to/iptables_bridge_approach/scripts/stop.sh devcontainer
+Restart=on-failure
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target

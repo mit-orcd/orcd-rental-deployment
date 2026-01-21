@@ -119,7 +119,7 @@ git checkout v1.1.7  # or latest stable
 
 # Clone ORCD plugin
 cd ..
-git clone https://github.com/christophernhill/cf-orcd-rental.git
+git clone https://github.com/mit-orcd/cf-orcd-rental.git
 ```
 
 ### 2.3 Set Up Virtual Environment
@@ -778,7 +778,7 @@ After creating a new tag:
    # On production server
    cd /srv/coldfront
    source venv/bin/activate
-   pip install --upgrade git+https://github.com/christophernhill/cf-orcd-rental.git@v0.2
+   pip install --upgrade git+https://github.com/mit-orcd/cf-orcd-rental.git@v0.2
    export PLUGIN_API=True DJANGO_SETTINGS_MODULE=local_settings
    coldfront migrate
    coldfront collectstatic --noinput

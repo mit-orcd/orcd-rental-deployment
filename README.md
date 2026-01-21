@@ -46,7 +46,7 @@ sudo dnf install -y git  # Amazon Linux / RHEL
 # sudo apt install -y git  # Debian / Ubuntu
 
 # 1. Clone this repository
-git clone https://github.com/christophernhill/orcd-rental-deployment.git
+git clone https://github.com/mit-orcd/orcd-rental-deployment.git
 cd orcd-rental-deployment
 
 # 2. Set up DNS A record pointing to your server's IP address
@@ -68,14 +68,19 @@ sudo ./scripts/install_nginx_app.sh --domain YOUR_DOMAIN
 cd /srv/coldfront
 source venv/bin/activate
 
+# IMPORTANT: Environment variables MUST be set BEFORE running any Django commands.
+# These variables are read when ColdFront's settings are loaded, which determines
+# which apps are installed and which migrations run. Setting them after import has no effect.
+
 # Load secrets from environment file (required for SECRET_KEY, OIDC credentials)
+# The coldfront.env file also contains PLUGIN_API, AUTO_PI_ENABLE, and
+# AUTO_DEFAULT_PROJECT_ENABLE which enable the ORCD plugin features.
 set -a
 source /srv/coldfront/coldfront.env
 set +a
 
 export PYTHONPATH=/srv/coldfront
 export DJANGO_SETTINGS_MODULE=local_settings
-export PLUGIN_API=True AUTO_PI_ENABLE=True AUTO_DEFAULT_PROJECT_ENABLE=True
 
 coldfront migrate
 coldfront initial_setup  # Load initial reference data (answer 'yes' when prompted)
@@ -103,7 +108,7 @@ The `config/deployment.conf` file controls key deployment settings:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `PLUGIN_REPO` | `https://github.com/christophernhill/cf-orcd-rental.git` | Plugin repository URL |
+| `PLUGIN_REPO` | `https://github.com/mit-orcd/cf-orcd-rental.git` | Plugin repository URL |
 | `PLUGIN_VERSION` | `v0.1` | Plugin version (git tag or branch) |
 | `COLDFRONT_VERSION` | `coldfront[common]` | ColdFront package version |
 | `APP_DIR` | `/srv/coldfront` | Installation directory |
@@ -116,7 +121,7 @@ The `config/deployment.conf` file controls key deployment settings:
 2. Change `PLUGIN_VERSION` to desired tag (e.g., `v0.2`)
 3. Run installation script
 
-**Available plugin versions:** https://github.com/christophernhill/cf-orcd-rental/tags
+**Available plugin versions:** https://github.com/mit-orcd/cf-orcd-rental/tags
 
 ## Documentation
 
@@ -196,6 +201,13 @@ The ORCD plugin is controlled by these environment variables:
 | `AUTO_PI_ENABLE` | `False` | Auto-set users as Principal Investigators |
 | `AUTO_DEFAULT_PROJECT_ENABLE` | `False` | Auto-create personal/group projects |
 
+> **Important:** These environment variables must be set in the shell BEFORE running any Django commands (including `migrate`, `collectstatic`, `shell`, etc.). ColdFront reads these variables when its settings module is first imported. Setting them via `os.environ.setdefault()` in Python code or after importing Django settings has no effect.
+>
+> The recommended approach is to add these variables to `coldfront.env` and source it before running Django commands:
+> ```bash
+> set -a && source /srv/coldfront/coldfront.env && set +a
+> ```
+
 ## Security
 
 ### Secrets Management
@@ -223,7 +235,7 @@ The ORCD plugin is controlled by these environment variables:
 
 ### ORCD Direct Charge Plugin
 
-The plugin (from https://github.com/christophernhill/cf-orcd-rental) adds:
+The plugin (from https://github.com/mit-orcd/cf-orcd-rental) adds:
 
 - GPU/CPU node management
 - Reservation system with calendar
@@ -232,7 +244,7 @@ The plugin (from https://github.com/christophernhill/cf-orcd-rental) adds:
 - Activity logging
 - Custom dashboard
 
-**Version Configuration:** The plugin version is specified in `config/deployment.conf` (default: v0.1). Check the [plugin repository](https://github.com/christophernhill/cf-orcd-rental/tags) for available versions.
+**Version Configuration:** The plugin version is specified in `config/deployment.conf` (default: v0.1). Check the [plugin repository](https://github.com/mit-orcd/cf-orcd-rental/tags) for available versions.
 
 ### OIDC Authentication
 
@@ -286,9 +298,10 @@ sudo systemctl status coldfront
 # Run health check
 ./scripts/healthcheck.sh
 
-# Django management
+# Django management (always source coldfront.env first!)
 cd /srv/coldfront && source venv/bin/activate
-export DJANGO_SETTINGS_MODULE=local_settings PLUGIN_API=True
+set -a && source /srv/coldfront/coldfront.env && set +a
+export DJANGO_SETTINGS_MODULE=local_settings PYTHONPATH=/srv/coldfront
 coldfront migrate
 coldfront collectstatic
 coldfront shell

@@ -203,7 +203,7 @@ For each distribution:
    ```bash
    # Launch fresh instance
    # SSH in and clone repo
-   git clone https://github.com/christophernhill/orcd-rental-deployment.git
+   git clone https://github.com/mit-orcd/orcd-rental-deployment.git
    cd orcd-rental-deployment
    git checkout feature/nginx-base-refactor
    ```

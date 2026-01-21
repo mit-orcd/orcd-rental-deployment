@@ -1,0 +1,5 @@
+# Ignore actual config files (they contain secrets)
+deploy-config.yaml
+
+# Keep the example file
+!deploy-config.yaml.example

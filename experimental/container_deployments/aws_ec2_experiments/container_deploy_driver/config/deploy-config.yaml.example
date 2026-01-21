@@ -1,0 +1,65 @@
+# ColdFront ORCD Rental Portal Deployment Configuration
+# Copy this file to deploy-config.yaml and fill in your values
+# DO NOT commit deploy-config.yaml (it contains secrets)
+
+# =============================================================================
+# Domain and Email Settings
+# =============================================================================
+domain: "your-domain.example.com"
+email: "admin@example.com"
+
+# =============================================================================
+# Superuser Account for ColdFront Admin
+# =============================================================================
+superuser:
+  username: "admin"
+  email: "admin@example.com"
+  password: "CHANGE_THIS_PASSWORD"
+
+# =============================================================================
+# Globus OIDC Credentials
+# Get these from: https://developers.globus.org/
+# =============================================================================
+globus:
+  client_id: "your-globus-client-id"
+  client_secret: "your-globus-client-secret"
+
+# =============================================================================
+# Plugin Version
+# Version of cf-orcd-rental plugin to install
+# See: https://github.com/mit-orcd/cf-orcd-rental/tags
+# Use "main" for latest, or a specific tag like "v0.1"
+# =============================================================================
+plugin_version: "main"
+
+# =============================================================================
+# Deployment Repository Settings
+# =============================================================================
+# Branch/tag of orcd-rental-deployment to clone inside the container.
+# If not specified, defaults to the current branch/tag of the host checkout.
+# Use "main" for stable, or a specific tag like "v1.0"
+# =============================================================================
+# deployment_repo_version: "main"
+
+# =============================================================================
+# Container Settings
+# =============================================================================
+container:
+  # Name of the running Apptainer instance
+  instance_name: "devcontainer"
+  # User account to create inside the container
+  service_user: "ec2-user"
+
+# =============================================================================
+# Certificate Persistence (Informational)
+# =============================================================================
+# To persist Let's Encrypt certificates across container restarts and avoid
+# rate limits, start the container with a bind mount:
+#   -B /srv/letsencrypt:/etc/letsencrypt
+#
+# The start.sh script enables this by default. Set CERT_PERSIST_DIR="" to disable.
+# 
+# After initial deployment, use --skip-prereqs flag to skip certificate
+# acquisition and reuse existing certificates:
+#   ./deploy-coldfront.sh --skip-prereqs config/deploy-config.yaml
+# =============================================================================

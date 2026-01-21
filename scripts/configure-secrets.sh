@@ -1,14 +1,37 @@
 #!/bin/bash
 # =============================================================================
-# ORCD Rental Portal - Interactive Secrets Configuration Script
+# ORCD Rental Portal - Secrets Configuration Script
 # =============================================================================
 #
-# This script interactively prompts for credentials and generates the
-# configuration files with actual secrets.
+# This script generates configuration files with credentials. It supports
+# both interactive and non-interactive (automated) modes.
 #
 # Usage:
-#   chmod +x configure-secrets.sh
+#   # Interactive mode (prompts for input):
 #   ./configure-secrets.sh
+#
+#   # Non-interactive mode (uses environment variables):
+#   export DOMAIN_NAME="rental.mit-orcd.org"
+#   export GLOBUS_CLIENT_ID="your-client-id"
+#   export GLOBUS_CLIENT_SECRET="your-client-secret"
+#   ./configure-secrets.sh --non-interactive
+#
+#   # Or just set the environment variables - script auto-detects:
+#   export DOMAIN_NAME="rental.mit-orcd.org"
+#   export GLOBUS_CLIENT_ID="your-client-id"
+#   export GLOBUS_CLIENT_SECRET="your-client-secret"
+#   ./configure-secrets.sh
+#
+# Environment Variables (for non-interactive mode):
+#   DOMAIN_NAME          - Your domain (e.g., rental.mit-orcd.org)
+#   GLOBUS_CLIENT_ID     - Globus OAuth Client ID
+#   GLOBUS_CLIENT_SECRET - Globus OAuth Client Secret
+#
+# The following plugin variables are automatically included in coldfront.env
+# from the template (required for ColdFront to load rest_framework.authtoken):
+#   PLUGIN_API=True
+#   AUTO_PI_ENABLE=True
+#   AUTO_DEFAULT_PROJECT_ENABLE=True
 #
 # Prerequisites:
 #   - install_nginx_base.sh must have been run first (Nginx with HTTPS)
@@ -79,7 +102,18 @@ detect_service_user() {
 # Input Collection
 # =============================================================================
 
+# Check if all required environment variables are set
+check_env_vars() {
+    if [[ -n "${DOMAIN_NAME}" ]] && [[ -n "${GLOBUS_CLIENT_ID}" ]] && [[ -n "${GLOBUS_CLIENT_SECRET}" ]]; then
+        return 0  # All set
+    fi
+    return 1  # Missing some
+}
+
+# Collect inputs - uses env vars if available, prompts otherwise
 collect_inputs() {
+    local NON_INTERACTIVE="${1:-false}"
+    
     echo ""
     echo "=============================================="
     echo " ORCD Rental Portal - Secrets Configuration"
@@ -146,9 +180,59 @@ collect_inputs() {
     if [[ -z "${OIDC_CLIENT_SECRET}" ]]; then
         log_error "Client Secret is required"
         exit 1
+    else
+        # Interactive mode - prompt for missing values
+        echo "This script will generate configuration files with your credentials."
+        echo "You will need:"
+        echo "  - Globus OAuth Client ID and Secret (from developers.globus.org)"
+        echo "  - Your domain name (e.g., rental.mit-orcd.org)"
+        echo ""
+        
+        # Domain name - use env var if set, otherwise prompt
+        if [[ -z "${DOMAIN_NAME}" ]]; then
+            prompt "Enter your domain name (e.g., rental.mit-orcd.org):"
+            read -r DOMAIN_NAME
+        else
+            log_info "Using DOMAIN_NAME from environment: ${DOMAIN_NAME}"
+        fi
+        if [[ -z "${DOMAIN_NAME}" ]]; then
+            log_error "Domain name is required"
+            exit 1
+        fi
+        
+        echo ""
+        
+        # Globus Client ID - use env var if set, otherwise prompt
+        if [[ -z "${GLOBUS_CLIENT_ID}" ]]; then
+            prompt "Enter your Globus OAuth Client ID:"
+            read -r OIDC_CLIENT_ID
+        else
+            log_info "Using GLOBUS_CLIENT_ID from environment"
+            OIDC_CLIENT_ID="${GLOBUS_CLIENT_ID}"
+        fi
+        if [[ -z "${OIDC_CLIENT_ID}" ]]; then
+            log_error "Client ID is required"
+            exit 1
+        fi
+        
+        echo ""
+        
+        # Globus Client Secret - use env var if set, otherwise prompt
+        if [[ -z "${GLOBUS_CLIENT_SECRET}" ]]; then
+            prompt "Enter your Globus OAuth Client Secret (input hidden):"
+            read -rs OIDC_CLIENT_SECRET
+            echo ""  # Newline after hidden input
+        else
+            log_info "Using GLOBUS_CLIENT_SECRET from environment"
+            OIDC_CLIENT_SECRET="${GLOBUS_CLIENT_SECRET}"
+        fi
+        if [[ -z "${OIDC_CLIENT_SECRET}" ]]; then
+            log_error "Client Secret is required"
+            exit 1
+        fi
+        
+        echo ""
     fi
-    
-    echo ""
     
     # Generate Secret Key
     log_info "Generating Django secret key..."
@@ -159,16 +243,26 @@ collect_inputs() {
     echo "  Provider:      ${OIDC_PROVIDER}"
     echo "  Template:      ${SETTINGS_TEMPLATE}"
     echo "  Domain:        ${DOMAIN_NAME}"
-    echo "  Client ID:     ${OIDC_CLIENT_ID}"
-    echo "  Client Secret: ****$(echo "${OIDC_CLIENT_SECRET}" | tail -c 5)"
+    echo "  Client ID:     ${OIDC_CLIENT_ID:0:8}..."
+    echo "  Client Secret: ****${OIDC_CLIENT_SECRET: -4}"
     echo "  Secret Key:    ${SECRET_KEY:0:20}..."
     echo ""
+    echo "Plugin settings (from template):"
+    echo "  PLUGIN_API=True"
+    echo "  AUTO_PI_ENABLE=True"
+    echo "  AUTO_DEFAULT_PROJECT_ENABLE=True"
+    echo ""
     
-    prompt "Create configuration files with these values? (y/n)"
-    read -r CONFIRM
-    if [[ ! "${CONFIRM}" =~ ^[Yy]$ ]]; then
-        log_warn "Cancelled by user"
-        exit 0
+    # Skip confirmation in non-interactive mode or if all env vars were provided
+    if [[ "${NON_INTERACTIVE}" == "true" ]] || check_env_vars; then
+        log_info "Proceeding with configuration..."
+    else
+        prompt "Create configuration files with these values? (y/n)"
+        read -r CONFIRM
+        if [[ ! "${CONFIRM}" =~ ^[Yy]$ ]]; then
+            log_warn "Cancelled by user"
+            exit 0
+        fi
     fi
 }
 
@@ -225,6 +319,8 @@ generate_coldfront_env() {
     log_info "Generating coldfront.env..."
     
     # Save a copy in secrets directory first (always works)
+    # Note: The template includes PLUGIN_API, AUTO_PI_ENABLE, and AUTO_DEFAULT_PROJECT_ENABLE
+    # These are critical for ColdFront to load rest_framework.authtoken during startup
     mkdir -p "${SECRETS_DIR}"
     sed -e "s|{{SECRET_KEY}}|${SECRET_KEY}|g" \
         -e "s|{{OIDC_CLIENT_ID}}|${OIDC_CLIENT_ID}|g" \
@@ -232,6 +328,7 @@ generate_coldfront_env() {
         "${TEMPLATE}" > "${SECRETS_COPY}"
     chmod 600 "${SECRETS_COPY}"
     log_info "Backup created: ${SECRETS_COPY}"
+    log_info "Plugin env vars included: PLUGIN_API, AUTO_PI_ENABLE, AUTO_DEFAULT_PROJECT_ENABLE"
     
     # Try to copy to app directory (may need sudo)
     if cp "${SECRETS_COPY}" "${OUTPUT}" 2>/dev/null; then
@@ -250,6 +347,27 @@ generate_coldfront_env() {
 deploy_coldfront_nginx() {
     log_warn "Nginx deployment has moved to scripts/install_nginx_app.sh"
     log_warn "Run: sudo ./scripts/install_nginx_app.sh --domain ${DOMAIN_NAME}"
+}
+
+copy_supporting_files() {
+    log_info "Copying supporting configuration files..."
+    
+    local files=("urls.py" "wsgi.py" "coldfront_auth.py")
+    
+    for file in "${files[@]}"; do
+        local src="${CONFIG_DIR}/${file}"
+        local dest="${APP_DIR}/${file}"
+        
+        if [[ -f "${src}" ]]; then
+            if cp "${src}" "${dest}" 2>/dev/null; then
+                log_info "Copied: ${dest}"
+            else
+                sudo cp "${src}" "${dest}"
+                sudo chown "${SERVICE_USER}:${SERVICE_USER}" "${dest}"
+                log_info "Copied: ${dest} (using sudo)"
+            fi
+        fi
+    done
 }
 
 # =============================================================================
@@ -307,7 +425,44 @@ print_next_steps() {
 # Main
 # =============================================================================
 
+show_help() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --non-interactive    Run without prompts (requires env vars)"
+    echo "  -h, --help          Show this help message"
+    echo ""
+    echo "Environment Variables (for non-interactive mode):"
+    echo "  DOMAIN_NAME          Your domain (e.g., rental.mit-orcd.org)"
+    echo "  GLOBUS_CLIENT_ID     Globus OAuth Client ID"
+    echo "  GLOBUS_CLIENT_SECRET Globus OAuth Client Secret"
+    echo ""
+    echo "If all environment variables are set, the script will automatically"
+    echo "run in non-interactive mode without requiring the --non-interactive flag."
+}
+
 main() {
+    local NON_INTERACTIVE=false
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --non-interactive)
+                NON_INTERACTIVE=true
+                shift
+                ;;
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+    
     # Check if we can access the app directory
     if [[ ! -d "${APP_DIR}" ]]; then
         log_error "Application directory not found: ${APP_DIR}"
@@ -323,9 +478,10 @@ main() {
     fi
     
     detect_service_user
-    collect_inputs
+    collect_inputs "${NON_INTERACTIVE}"
     generate_local_settings
     generate_coldfront_env
+    copy_supporting_files
     print_next_steps
 }
 

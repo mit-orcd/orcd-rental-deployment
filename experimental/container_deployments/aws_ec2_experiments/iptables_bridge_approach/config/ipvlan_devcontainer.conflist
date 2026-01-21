@@ -1,0 +1,23 @@
+{
+    "cniVersion": "1.0.0",
+    "name": "ipvlan_devcontainer",
+    "plugins": [
+        {
+            "type": "ipvlan",
+            "master": "enX0",
+            "mode": "l2",
+            "ipam": {
+                "type": "static",
+                "addresses": [
+                    {
+                        "address": "172.31.39.246/20",
+                        "gateway": "172.31.32.1"
+                    }
+                ],
+                "routes": [
+                    { "dst": "0.0.0.0/0" }
+                ]
+            }
+        }
+    ]
+}

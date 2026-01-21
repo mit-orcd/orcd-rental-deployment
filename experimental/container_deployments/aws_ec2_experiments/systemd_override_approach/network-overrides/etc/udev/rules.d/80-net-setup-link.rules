@@ -1,0 +1,2 @@
+# Empty override to disable predictable network interface renaming.
+# Equivalent to masking 80-net-setup-link.rules.
