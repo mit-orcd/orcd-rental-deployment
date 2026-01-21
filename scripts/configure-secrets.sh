@@ -180,59 +180,9 @@ collect_inputs() {
     if [[ -z "${OIDC_CLIENT_SECRET}" ]]; then
         log_error "Client Secret is required"
         exit 1
-    else
-        # Interactive mode - prompt for missing values
-        echo "This script will generate configuration files with your credentials."
-        echo "You will need:"
-        echo "  - Globus OAuth Client ID and Secret (from developers.globus.org)"
-        echo "  - Your domain name (e.g., rental.mit-orcd.org)"
-        echo ""
-        
-        # Domain name - use env var if set, otherwise prompt
-        if [[ -z "${DOMAIN_NAME}" ]]; then
-            prompt "Enter your domain name (e.g., rental.mit-orcd.org):"
-            read -r DOMAIN_NAME
-        else
-            log_info "Using DOMAIN_NAME from environment: ${DOMAIN_NAME}"
-        fi
-        if [[ -z "${DOMAIN_NAME}" ]]; then
-            log_error "Domain name is required"
-            exit 1
-        fi
-        
-        echo ""
-        
-        # Globus Client ID - use env var if set, otherwise prompt
-        if [[ -z "${GLOBUS_CLIENT_ID}" ]]; then
-            prompt "Enter your Globus OAuth Client ID:"
-            read -r OIDC_CLIENT_ID
-        else
-            log_info "Using GLOBUS_CLIENT_ID from environment"
-            OIDC_CLIENT_ID="${GLOBUS_CLIENT_ID}"
-        fi
-        if [[ -z "${OIDC_CLIENT_ID}" ]]; then
-            log_error "Client ID is required"
-            exit 1
-        fi
-        
-        echo ""
-        
-        # Globus Client Secret - use env var if set, otherwise prompt
-        if [[ -z "${GLOBUS_CLIENT_SECRET}" ]]; then
-            prompt "Enter your Globus OAuth Client Secret (input hidden):"
-            read -rs OIDC_CLIENT_SECRET
-            echo ""  # Newline after hidden input
-        else
-            log_info "Using GLOBUS_CLIENT_SECRET from environment"
-            OIDC_CLIENT_SECRET="${GLOBUS_CLIENT_SECRET}"
-        fi
-        if [[ -z "${OIDC_CLIENT_SECRET}" ]]; then
-            log_error "Client Secret is required"
-            exit 1
-        fi
-        
-        echo ""
     fi
+    
+    echo ""
     
     # Generate Secret Key
     log_info "Generating Django secret key..."
