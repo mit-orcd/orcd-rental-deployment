@@ -120,14 +120,6 @@ OIDC_STATE_COOKIE_PATH = '/'
 OIDC_STATE_COOKIE_DOMAIN = None
 
 # =============================================================================
-# LOGIN BEHAVIOR
-# =============================================================================
-
-# Skip the login page and redirect directly to OIDC provider (MIT Touchstone)
-# This bypasses the intermediate /user/login/ page
-LOGIN_URL = '/oidc/authenticate/'
-
-# =============================================================================
 # GENERIC OIDC AUTHENTICATION
 # =============================================================================
 #
