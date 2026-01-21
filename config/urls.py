@@ -10,17 +10,6 @@
 
 from coldfront.config.urls import urlpatterns
 from django.urls import path, include
-from django.views.generic import RedirectView
-
-# =============================================================================
-# LOGIN REDIRECT (Generic OIDC only)
-# =============================================================================
-# Redirect /user/login/ directly to OIDC provider (e.g., MIT Touchstone)
-# This bypasses the intermediate login page.
-# Comment out these lines if you want to show the login page instead.
-urlpatterns = [
-    path('user/login/', RedirectView.as_view(url='/oidc/authenticate/', permanent=False), name='login'),
-] + urlpatterns
 
 # Add OIDC authentication URLs
 # These provide:
