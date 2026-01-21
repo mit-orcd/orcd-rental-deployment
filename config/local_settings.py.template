@@ -93,6 +93,13 @@ DATABASES = {
 STATIC_ROOT = '/srv/coldfront/static/'
 
 # =============================================================================
+# CUSTOM TEMPLATES
+# =============================================================================
+
+# Site-specific template overrides (e.g., custom login page)
+SITE_TEMPLATES = '/srv/coldfront/templates'
+
+# =============================================================================
 # SSL & PROXY SETTINGS (Required for Nginx reverse proxy)
 # =============================================================================
 

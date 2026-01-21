@@ -318,6 +318,21 @@ copy_supporting_files() {
             fi
         fi
     done
+    
+    # Copy custom templates directory
+    local templates_src="${CONFIG_DIR}/templates"
+    local templates_dest="${APP_DIR}/templates"
+    
+    if [[ -d "${templates_src}" ]]; then
+        log_info "Copying custom templates..."
+        if cp -r "${templates_src}" "${templates_dest}" 2>/dev/null; then
+            log_info "Copied: ${templates_dest}"
+        else
+            sudo cp -r "${templates_src}" "${templates_dest}"
+            sudo chown -R "${SERVICE_USER}:${SERVICE_USER}" "${templates_dest}"
+            log_info "Copied: ${templates_dest} (using sudo)"
+        fi
+    fi
 }
 
 # =============================================================================
