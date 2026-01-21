@@ -10,22 +10,43 @@
 #   # Interactive mode (prompts for input):
 #   ./configure-secrets.sh
 #
-#   # Non-interactive mode (uses environment variables):
+#   # Non-interactive mode with Globus (uses environment variables):
 #   export DOMAIN_NAME="rental.mit-orcd.org"
-#   export GLOBUS_CLIENT_ID="your-client-id"
-#   export GLOBUS_CLIENT_SECRET="your-client-secret"
+#   export OIDC_PROVIDER="globus"
+#   export OIDC_CLIENT_ID="your-client-id"
+#   export OIDC_CLIENT_SECRET="your-client-secret"
 #   ./configure-secrets.sh --non-interactive
 #
-#   # Or just set the environment variables - script auto-detects:
+#   # Non-interactive mode with generic OIDC (e.g., Okta):
+#   export DOMAIN_NAME="rental.mit-orcd.org"
+#   export OIDC_PROVIDER="generic"
+#   export OIDC_CLIENT_ID="your-client-id"
+#   export OIDC_CLIENT_SECRET="your-client-secret"
+#   export OIDC_AUTHORIZATION_ENDPOINT="https://okta.mit.edu/oauth2/v1/authorize"
+#   export OIDC_TOKEN_ENDPOINT="https://okta.mit.edu/oauth2/v1/token"
+#   export OIDC_USERINFO_ENDPOINT="https://okta.mit.edu/oauth2/v1/userinfo"
+#   export OIDC_JWKS_ENDPOINT="https://okta.mit.edu/oauth2/v1/keys"
+#   ./configure-secrets.sh --non-interactive
+#
+#   # Legacy mode (backward compatible - auto-detects Globus):
 #   export DOMAIN_NAME="rental.mit-orcd.org"
 #   export GLOBUS_CLIENT_ID="your-client-id"
 #   export GLOBUS_CLIENT_SECRET="your-client-secret"
 #   ./configure-secrets.sh
 #
 # Environment Variables (for non-interactive mode):
-#   DOMAIN_NAME          - Your domain (e.g., rental.mit-orcd.org)
-#   GLOBUS_CLIENT_ID     - Globus OAuth Client ID
-#   GLOBUS_CLIENT_SECRET - Globus OAuth Client Secret
+#   DOMAIN_NAME                  - Your domain (e.g., rental.mit-orcd.org)
+#   OIDC_PROVIDER                - 'globus' or 'generic'
+#   OIDC_CLIENT_ID               - OAuth Client ID
+#   OIDC_CLIENT_SECRET           - OAuth Client Secret
+#   OIDC_AUTHORIZATION_ENDPOINT  - (generic only) Authorization endpoint
+#   OIDC_TOKEN_ENDPOINT          - (generic only) Token endpoint
+#   OIDC_USERINFO_ENDPOINT       - (generic only) UserInfo endpoint
+#   OIDC_JWKS_ENDPOINT           - (generic only) JWKS endpoint
+#
+# Legacy Environment Variables (backward compatible):
+#   GLOBUS_CLIENT_ID     - Maps to OIDC_CLIENT_ID, implies globus provider
+#   GLOBUS_CLIENT_SECRET - Maps to OIDC_CLIENT_SECRET
 #
 # The following plugin variables are automatically included in coldfront.env
 # from the template (required for ColdFront to load rest_framework.authtoken):
@@ -102,12 +123,42 @@ detect_service_user() {
 # Input Collection
 # =============================================================================
 
-# Check if all required environment variables are set
+# Check if all required environment variables are set for non-interactive mode
+# Supports both new OIDC_* vars and legacy GLOBUS_* vars for backward compatibility
 check_env_vars() {
-    if [[ -n "${DOMAIN_NAME}" ]] && [[ -n "${GLOBUS_CLIENT_ID}" ]] && [[ -n "${GLOBUS_CLIENT_SECRET}" ]]; then
-        return 0  # All set
+    # Check for domain name
+    if [[ -z "${DOMAIN_NAME}" ]]; then
+        return 1
     fi
-    return 1  # Missing some
+    
+    # Check for OIDC provider (default to globus for backward compatibility)
+    if [[ -z "${OIDC_PROVIDER}" ]]; then
+        # Legacy mode: if GLOBUS_CLIENT_ID is set, assume globus provider
+        if [[ -n "${GLOBUS_CLIENT_ID}" ]] && [[ -n "${GLOBUS_CLIENT_SECRET}" ]]; then
+            return 0  # Legacy Globus mode
+        fi
+        return 1
+    fi
+    
+    # Check for client credentials (support both new and legacy names)
+    local client_id="${OIDC_CLIENT_ID:-${GLOBUS_CLIENT_ID}}"
+    local client_secret="${OIDC_CLIENT_SECRET:-${GLOBUS_CLIENT_SECRET}}"
+    
+    if [[ -z "${client_id}" ]] || [[ -z "${client_secret}" ]]; then
+        return 1
+    fi
+    
+    # For generic OIDC, also need endpoints
+    if [[ "${OIDC_PROVIDER}" == "generic" ]]; then
+        if [[ -z "${OIDC_AUTHORIZATION_ENDPOINT}" ]] || \
+           [[ -z "${OIDC_TOKEN_ENDPOINT}" ]] || \
+           [[ -z "${OIDC_USERINFO_ENDPOINT}" ]] || \
+           [[ -z "${OIDC_JWKS_ENDPOINT}" ]]; then
+            return 1
+        fi
+    fi
+    
+    return 0  # All required vars set
 }
 
 # Collect inputs - uses env vars if available, prompts otherwise
@@ -119,70 +170,105 @@ collect_inputs() {
     echo " ORCD Rental Portal - Secrets Configuration"
     echo "=============================================="
     echo ""
-    echo "This script will generate configuration files with your credentials."
-    echo ""
     
-    # OIDC Provider Selection
-    echo "Select your OIDC provider:"
-    echo "  1) Globus Auth (auth.globus.org)"
-    echo "  2) Generic OIDC (Okta, Keycloak, Azure AD, etc.)"
-    echo ""
-    prompt "Enter choice [1-2]:"
-    read -r PROVIDER_CHOICE
-    
-    case "${PROVIDER_CHOICE}" in
-        1)
+    # Check if we have all required env vars for non-interactive mode
+    if check_env_vars; then
+        log_info "Using environment variables for configuration"
+        
+        # Set OIDC provider (default to globus for backward compatibility)
+        if [[ -z "${OIDC_PROVIDER}" ]]; then
             OIDC_PROVIDER="globus"
-            SETTINGS_TEMPLATE="local_settings.globus.py.template"
-            echo ""
-            log_info "Using Globus Auth configuration"
-            echo "  Register your app at: https://developers.globus.org/"
-            ;;
-        2)
-            OIDC_PROVIDER="generic"
-            SETTINGS_TEMPLATE="local_settings.generic.py.template"
-            echo ""
-            log_info "Using Generic OIDC configuration"
-            echo "  Find your endpoints at: https://your-provider/.well-known/openid-configuration"
-            ;;
-        *)
-            log_error "Invalid choice. Please enter 1 or 2."
+            log_info "OIDC_PROVIDER not set, defaulting to 'globus'"
+        fi
+        
+        # Set template based on provider
+        SETTINGS_TEMPLATE="local_settings.${OIDC_PROVIDER}.py.template"
+        
+        # Map legacy env var names to new names if needed
+        OIDC_CLIENT_ID="${OIDC_CLIENT_ID:-${GLOBUS_CLIENT_ID}}"
+        OIDC_CLIENT_SECRET="${OIDC_CLIENT_SECRET:-${GLOBUS_CLIENT_SECRET}}"
+        
+    elif [[ "${NON_INTERACTIVE}" == "true" ]]; then
+        log_error "Non-interactive mode requires all environment variables to be set:"
+        log_error "  Required: DOMAIN_NAME, OIDC_PROVIDER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET"
+        log_error "  (Or legacy: DOMAIN_NAME, GLOBUS_CLIENT_ID, GLOBUS_CLIENT_SECRET)"
+        log_error ""
+        log_error "  For generic OIDC, also required:"
+        log_error "    OIDC_AUTHORIZATION_ENDPOINT, OIDC_TOKEN_ENDPOINT,"
+        log_error "    OIDC_USERINFO_ENDPOINT, OIDC_JWKS_ENDPOINT"
+        log_error ""
+        [[ -z "${DOMAIN_NAME}" ]] && log_error "  Missing: DOMAIN_NAME"
+        [[ -z "${OIDC_PROVIDER}" ]] && [[ -z "${GLOBUS_CLIENT_ID}" ]] && log_error "  Missing: OIDC_PROVIDER (or GLOBUS_CLIENT_ID for legacy mode)"
+        [[ -z "${OIDC_CLIENT_ID}" ]] && [[ -z "${GLOBUS_CLIENT_ID}" ]] && log_error "  Missing: OIDC_CLIENT_ID (or GLOBUS_CLIENT_ID)"
+        [[ -z "${OIDC_CLIENT_SECRET}" ]] && [[ -z "${GLOBUS_CLIENT_SECRET}" ]] && log_error "  Missing: OIDC_CLIENT_SECRET (or GLOBUS_CLIENT_SECRET)"
+        exit 1
+    else
+        # Interactive mode - prompt for all values
+        echo "This script will generate configuration files with your credentials."
+        echo ""
+        
+        # OIDC Provider Selection
+        echo "Select your OIDC provider:"
+        echo "  1) Globus Auth (auth.globus.org)"
+        echo "  2) Generic OIDC (Okta, Keycloak, Azure AD, etc.)"
+        echo ""
+        prompt "Enter choice [1-2]:"
+        read -r PROVIDER_CHOICE
+        
+        case "${PROVIDER_CHOICE}" in
+            1)
+                OIDC_PROVIDER="globus"
+                SETTINGS_TEMPLATE="local_settings.globus.py.template"
+                echo ""
+                log_info "Using Globus Auth configuration"
+                echo "  Register your app at: https://developers.globus.org/"
+                ;;
+            2)
+                OIDC_PROVIDER="generic"
+                SETTINGS_TEMPLATE="local_settings.generic.py.template"
+                echo ""
+                log_info "Using Generic OIDC configuration"
+                echo "  Find your endpoints at: https://your-provider/.well-known/openid-configuration"
+                ;;
+            *)
+                log_error "Invalid choice. Please enter 1 or 2."
+                exit 1
+                ;;
+        esac
+        
+        echo ""
+        
+        # Domain name
+        prompt "Enter your domain name (e.g., rental.mit-orcd.org):"
+        read -r DOMAIN_NAME
+        if [[ -z "${DOMAIN_NAME}" ]]; then
+            log_error "Domain name is required"
             exit 1
-            ;;
-    esac
-    
-    echo ""
-    
-    # Domain name
-    prompt "Enter your domain name (e.g., rental.mit-orcd.org):"
-    read -r DOMAIN_NAME
-    if [[ -z "${DOMAIN_NAME}" ]]; then
-        log_error "Domain name is required"
-        exit 1
+        fi
+        
+        echo ""
+        
+        # OIDC Client ID
+        prompt "Enter your OIDC Client ID:"
+        read -r OIDC_CLIENT_ID
+        if [[ -z "${OIDC_CLIENT_ID}" ]]; then
+            log_error "Client ID is required"
+            exit 1
+        fi
+        
+        echo ""
+        
+        # OIDC Client Secret (hidden input)
+        prompt "Enter your OIDC Client Secret (input hidden):"
+        read -rs OIDC_CLIENT_SECRET
+        echo ""  # Newline after hidden input
+        if [[ -z "${OIDC_CLIENT_SECRET}" ]]; then
+            log_error "Client Secret is required"
+            exit 1
+        fi
+        
+        echo ""
     fi
-    
-    echo ""
-    
-    # OIDC Client ID
-    prompt "Enter your OIDC Client ID:"
-    read -r OIDC_CLIENT_ID
-    if [[ -z "${OIDC_CLIENT_ID}" ]]; then
-        log_error "Client ID is required"
-        exit 1
-    fi
-    
-    echo ""
-    
-    # OIDC Client Secret (hidden input)
-    prompt "Enter your OIDC Client Secret (input hidden):"
-    read -rs OIDC_CLIENT_SECRET
-    echo ""  # Newline after hidden input
-    if [[ -z "${OIDC_CLIENT_SECRET}" ]]; then
-        log_error "Client Secret is required"
-        exit 1
-    fi
-    
-    echo ""
     
     # Generate Secret Key
     log_info "Generating Django secret key..."
@@ -398,11 +484,24 @@ show_help() {
     echo "  -h, --help          Show this help message"
     echo ""
     echo "Environment Variables (for non-interactive mode):"
-    echo "  DOMAIN_NAME          Your domain (e.g., rental.mit-orcd.org)"
-    echo "  GLOBUS_CLIENT_ID     Globus OAuth Client ID"
-    echo "  GLOBUS_CLIENT_SECRET Globus OAuth Client Secret"
     echo ""
-    echo "If all environment variables are set, the script will automatically"
+    echo "  Required:"
+    echo "    DOMAIN_NAME          Your domain (e.g., rental.mit-orcd.org)"
+    echo "    OIDC_PROVIDER        'globus' or 'generic'"
+    echo "    OIDC_CLIENT_ID       OAuth Client ID"
+    echo "    OIDC_CLIENT_SECRET   OAuth Client Secret"
+    echo ""
+    echo "  For generic OIDC providers (Okta, Keycloak, etc.), also required:"
+    echo "    OIDC_AUTHORIZATION_ENDPOINT  Authorization endpoint URL"
+    echo "    OIDC_TOKEN_ENDPOINT          Token endpoint URL"
+    echo "    OIDC_USERINFO_ENDPOINT       UserInfo endpoint URL"
+    echo "    OIDC_JWKS_ENDPOINT           JWKS endpoint URL"
+    echo ""
+    echo "  Legacy (backward compatibility):"
+    echo "    GLOBUS_CLIENT_ID     Maps to OIDC_CLIENT_ID, implies OIDC_PROVIDER=globus"
+    echo "    GLOBUS_CLIENT_SECRET Maps to OIDC_CLIENT_SECRET"
+    echo ""
+    echo "If all required environment variables are set, the script will automatically"
     echo "run in non-interactive mode without requiring the --non-interactive flag."
 }
 
