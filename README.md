@@ -1,6 +1,6 @@
 # ORCD Rental Portal - Deployment Package
 
-This package contains everything needed to deploy the ORCD Rental Portal. The portal is built on [ColdFront](https://coldfront.io/) with the ORCD Direct Charge plugin and uses MIT Okta OIDC for authentication.
+This package contains everything needed to deploy the ORCD Rental Portal. The portal is built on [ColdFront](https://coldfront.io/) with the ORCD Direct Charge plugin and supports OIDC authentication via Globus Auth or generic OIDC providers (Okta, Keycloak, Azure AD, etc.).
 
 ## Supported Distributions
 

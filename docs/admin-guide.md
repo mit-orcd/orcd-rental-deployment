@@ -1,6 +1,6 @@
 # ORCD Rental Portal - Administrator Guide
 
-This guide provides complete instructions for deploying and maintaining the ORCD Rental Portal. The portal is built on ColdFront with the ORCD Direct Charge plugin and uses MIT Okta OIDC for authentication.
+This guide provides complete instructions for deploying and maintaining the ORCD Rental Portal. The portal is built on ColdFront with the ORCD Direct Charge plugin and supports OIDC authentication via Globus Auth or generic OIDC providers (Okta, Keycloak, Azure AD, etc.).
 
 **Supported Distributions:**
 - Amazon Linux 2023 (primary target)
