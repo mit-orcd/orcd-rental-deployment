@@ -528,7 +528,7 @@ OIDC_STATE_COOKIE_DOMAIN = None
 # MIT OKTA OIDC AUTHENTICATION
 # =============================================================================
 AUTHENTICATION_BACKENDS = [
-    'coldfront_auth.MITOktaOIDCBackend',
+    'coldfront_auth.GenericOIDCBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 
@@ -1001,7 +1001,7 @@ This indicates the custom auth backend isn't being used. Verify:
 ```python
 # In local_settings.py
 AUTHENTICATION_BACKENDS = [
-    'coldfront_auth.MITOktaOIDCBackend',  # Must be first
+    'coldfront_auth.GenericOIDCBackend',  # Must be first
     'django.contrib.auth.backends.ModelBackend',
 ]
 ```
