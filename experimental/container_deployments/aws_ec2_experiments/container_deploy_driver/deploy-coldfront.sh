@@ -339,7 +339,7 @@ configure_plugin_version() {
     if container_exec_user "test -f $config_file"; then
         # Update existing PLUGIN_VERSION line or add it
         if container_exec_user "grep -q '^PLUGIN_VERSION=' $config_file"; then
-            container_exec_user "sed -i 's/^PLUGIN_VERSION=.*/PLUGIN_VERSION=\"$PLUGIN_VERSION\"/' $config_file"
+            container_exec_user "sed -i 's|^PLUGIN_VERSION=.*|PLUGIN_VERSION=\"$PLUGIN_VERSION\"|' $config_file"
         else
             container_exec_user "echo 'PLUGIN_VERSION=\"$PLUGIN_VERSION\"' >> $config_file"
         fi
