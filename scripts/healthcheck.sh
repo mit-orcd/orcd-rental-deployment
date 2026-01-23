@@ -156,17 +156,37 @@ echo ""
 
 # SSL Certificate
 echo "--- SSL Certificate ---"
-# Try to find any certificate in letsencrypt live directory
+# Get domain from nginx config for SSL checks
+SSL_TEST_DOMAIN=$(grep -oP 'server_name\s+\K[^;]+' /etc/nginx/conf.d/coldfront-app.conf 2>/dev/null | head -1 | awk '{print $1}')
+
+# Try to find certificate - check nginx config first for actual path
 CERT_FILE=""
-if [[ -d "/etc/letsencrypt/live" ]]; then
-    # Find the first certificate directory
+CERT_DOMAIN=""
+
+# Method 1: Extract cert path from nginx config
+NGINX_CERT_PATH=$(grep -oP 'ssl_certificate\s+\K[^;]+' /etc/nginx/conf.d/coldfront-app.conf 2>/dev/null | head -1)
+if [[ -n "${NGINX_CERT_PATH}" && -f "${NGINX_CERT_PATH}" ]]; then
+    CERT_FILE="${NGINX_CERT_PATH}"
+    CERT_DOMAIN="${SSL_TEST_DOMAIN}"
+fi
+
+# Method 2: Check letsencrypt live directory for domain-specific cert
+if [[ -z "${CERT_FILE}" && -n "${SSL_TEST_DOMAIN}" && -d "/etc/letsencrypt/live/${SSL_TEST_DOMAIN}" ]]; then
+    if [[ -f "/etc/letsencrypt/live/${SSL_TEST_DOMAIN}/fullchain.pem" ]]; then
+        CERT_FILE="/etc/letsencrypt/live/${SSL_TEST_DOMAIN}/fullchain.pem"
+        CERT_DOMAIN="${SSL_TEST_DOMAIN}"
+    fi
+fi
+
+# Method 3: Search all letsencrypt certs (requires sudo for /etc/letsencrypt/live)
+if [[ -z "${CERT_FILE}" && -d "/etc/letsencrypt/live" ]]; then
     for dir in /etc/letsencrypt/live/*/; do
         if [[ -f "${dir}fullchain.pem" ]]; then
             CERT_FILE="${dir}fullchain.pem"
             CERT_DOMAIN=$(basename "${dir%/}")
             break
         fi
-    done
+    done 2>/dev/null
 fi
 
 if [[ -n "${CERT_FILE}" && -f "${CERT_FILE}" ]]; then
@@ -191,7 +211,10 @@ if [[ -n "${CERT_FILE}" && -f "${CERT_FILE}" ]]; then
     fi
 else
     # Check if HTTPS is actually working even if we can't find the cert file
-    if curl -s -o /dev/null -w "%{http_code}" -k https://localhost/ 2>/dev/null | grep -qE "^(200|301|302)"; then
+    # Use domain from nginx config with Host header
+    CURL_DOMAIN="${SSL_TEST_DOMAIN:-localhost}"
+    HTTPS_TEST=$(curl -s -o /dev/null -w "%{http_code}" -k -H "Host: ${CURL_DOMAIN}" https://localhost/ 2>/dev/null || echo "000")
+    if echo "${HTTPS_TEST}" | grep -qE "^(200|301|302)"; then
         check_warn "SSL is working but certificate file not found in /etc/letsencrypt/live/"
     else
         check_fail "SSL certificate not found (run certbot)"
