@@ -230,8 +230,16 @@ if [[ -f "/srv/coldfront/venv/bin/python" ]]; then
     # Try to import Django
     cd /srv/coldfront
     source venv/bin/activate
+    
+    # Load environment variables from coldfront.env
+    if [[ -f "/srv/coldfront/coldfront.env" ]]; then
+        set -a  # Export all variables
+        source /srv/coldfront/coldfront.env
+        set +a
+    fi
+    
     export DJANGO_SETTINGS_MODULE=local_settings
-    export PLUGIN_API=True
+    export PYTHONPATH=/srv/coldfront
     
     if python -c "import django; django.setup()" 2>/dev/null; then
         check_pass "Django configuration is valid"
