@@ -111,7 +111,7 @@ check_file "/srv/coldfront/local_settings.py" "Django settings"
 check_file "/srv/coldfront/coldfront.env" "Environment file"
 check_file "/srv/coldfront/coldfront_auth.py" "OIDC backend"
 check_file "/srv/coldfront/wsgi.py" "WSGI entry"
-check_file "/etc/nginx/conf.d/coldfront.conf" "Nginx config"
+check_file "/etc/nginx/conf.d/coldfront-app.conf" "Nginx config"
 check_file "/etc/systemd/system/coldfront.service" "Systemd service"
 echo ""
 
@@ -245,7 +245,7 @@ echo ""
 echo "--- Web Response Test ---"
 if command -v curl &> /dev/null; then
     # Get domain from nginx config for proper Host header testing
-    TEST_DOMAIN=$(grep -oP 'server_name\s+\K[^;]+' /etc/nginx/conf.d/coldfront.conf 2>/dev/null | head -1 | awk '{print $1}')
+    TEST_DOMAIN=$(grep -oP 'server_name\s+\K[^;]+' /etc/nginx/conf.d/coldfront-app.conf 2>/dev/null | head -1 | awk '{print $1}')
     if [[ -z "${TEST_DOMAIN}" ]]; then
         TEST_DOMAIN="localhost"
     fi
