@@ -253,13 +253,15 @@ copy_config_files() {
     cp "${CONFIG_DIR}/urls.py" "${APP_DIR}/"
     chown "${SERVICE_USER}:${SERVICE_USER}" "${APP_DIR}/urls.py"
     
-    # Copy systemd service (with correct Redis service name)
+    # Copy systemd service (with correct Redis service name and user)
     if [[ "${DISTRO_ID}" == "amzn" ]]; then
         REDIS_SERVICE="redis6"
     else
         REDIS_SERVICE="redis"
     fi
-    sed "s/redis6/${REDIS_SERVICE}/g" "${CONFIG_DIR}/systemd/coldfront.service" > /etc/systemd/system/coldfront.service
+    sed -e "s/redis6/${REDIS_SERVICE}/g" \
+        -e "s/{{SERVICE_USER}}/${SERVICE_USER}/g" \
+        "${CONFIG_DIR}/systemd/coldfront.service" > /etc/systemd/system/coldfront.service
     
     log_info "Configuration files copied"
     log_info "Note: local_settings.py and coldfront.env must be created using configure-secrets.sh"
