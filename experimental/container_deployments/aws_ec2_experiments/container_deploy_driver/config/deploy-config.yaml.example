@@ -17,8 +17,33 @@ superuser:
   password: "CHANGE_THIS_PASSWORD"
 
 # =============================================================================
-# Globus OIDC Credentials
-# Get these from: https://developers.globus.org/
+# OIDC Authentication Configuration
+# =============================================================================
+# Choose your OIDC provider: "globus" or "generic"
+#
+# Globus Auth: Register at https://developers.globus.org/
+# Generic OIDC: Okta, Keycloak, Azure AD, etc.
+#   Find endpoints at: https://your-provider/.well-known/openid-configuration
+# =============================================================================
+oidc:
+  # Provider type: "globus" or "generic"
+  provider: "globus"
+  
+  # OAuth credentials (required for both providers)
+  client_id: "your-client-id"
+  client_secret: "your-client-secret"
+  
+  # Generic OIDC endpoints (required only when provider: "generic")
+  # Example below shows MIT Okta endpoints
+  # authorization_endpoint: "https://okta.mit.edu/oauth2/v1/authorize"
+  # token_endpoint: "https://okta.mit.edu/oauth2/v1/token"
+  # userinfo_endpoint: "https://okta.mit.edu/oauth2/v1/userinfo"
+  # jwks_endpoint: "https://okta.mit.edu/oauth2/v1/keys"
+
+# =============================================================================
+# Legacy Globus Configuration (backward compatible)
+# =============================================================================
+# If oidc section is not present, these values are used with provider=globus
 # =============================================================================
 globus:
   client_id: "your-globus-client-id"

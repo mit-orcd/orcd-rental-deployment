@@ -34,6 +34,37 @@
           - domain_name | length > 0
         fail_msg: "domain_name must be provided via -e domain_name=YOUR_DOMAIN"
 
+    # =========================================================================
+    # Disable SELinux (required for systemd EnvironmentFile access)
+    # =========================================================================
+    - name: Check if SELinux is installed
+      ansible.builtin.stat:
+        path: /etc/selinux/config
+      register: selinux_config
+
+    - name: Disable SELinux in config (requires reboot)
+      ansible.builtin.lineinfile:
+        path: /etc/selinux/config
+        regexp: '^SELINUX='
+        line: 'SELINUX=disabled'
+        backup: true
+      when: selinux_config.stat.exists
+      register: selinux_config_changed
+
+    - name: Set SELinux to permissive immediately (no reboot needed)
+      ansible.builtin.command: setenforce 0
+      when: selinux_config.stat.exists
+      register: setenforce_result
+      changed_when: setenforce_result.rc == 0
+      failed_when: false
+
+    - name: Note about SELinux
+      ansible.builtin.debug:
+        msg: |
+          SELinux has been set to permissive mode.
+          A reboot is required to fully disable SELinux.
+      when: selinux_config.stat.exists and selinux_config_changed.changed
+
     - name: Verify nginx is running
       ansible.builtin.systemd:
         name: nginx
@@ -104,6 +135,7 @@
           SSL Certificate: {{ 'Found' if ssl_cert.stat.exists else 'Missing' }}
           
           Security Components:
+            - SELinux: {{ 'Disabled' if selinux_config.stat.exists else 'Not installed' }}
             - fail2ban: {{ 'Installed' if install_fail2ban else 'Skipped' }}
             - rkhunter: {{ 'Installed' if install_rkhunter else 'Skipped' }}
           

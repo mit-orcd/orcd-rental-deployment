@@ -80,11 +80,23 @@ echo ""
 echo "Timestamp: $(date)"
 echo ""
 
+# Determine Redis service name based on distro
+if [[ -f /etc/os-release ]]; then
+    . /etc/os-release
+    if [[ "${ID}" == "amzn" ]]; then
+        REDIS_SERVICE="redis6"
+    else
+        REDIS_SERVICE="redis"
+    fi
+else
+    REDIS_SERVICE="redis"
+fi
+
 # System Services
 echo "--- System Services ---"
 check_service "coldfront"
 check_service "nginx"
-check_service "redis6"
+check_service "${REDIS_SERVICE}"
 echo ""
 
 # Network Ports
@@ -99,7 +111,7 @@ check_file "/srv/coldfront/local_settings.py" "Django settings"
 check_file "/srv/coldfront/coldfront.env" "Environment file"
 check_file "/srv/coldfront/coldfront_auth.py" "OIDC backend"
 check_file "/srv/coldfront/wsgi.py" "WSGI entry"
-check_file "/etc/nginx/conf.d/coldfront.conf" "Nginx config"
+check_file "/etc/nginx/conf.d/coldfront-app.conf" "Nginx config"
 check_file "/etc/systemd/system/coldfront.service" "Systemd service"
 echo ""
 
@@ -144,17 +156,37 @@ echo ""
 
 # SSL Certificate
 echo "--- SSL Certificate ---"
-# Try to find any certificate in letsencrypt live directory
+# Get domain from nginx config for SSL checks
+SSL_TEST_DOMAIN=$(grep -oP 'server_name\s+\K[^;]+' /etc/nginx/conf.d/coldfront-app.conf 2>/dev/null | head -1 | awk '{print $1}')
+
+# Try to find certificate - check nginx config first for actual path
 CERT_FILE=""
-if [[ -d "/etc/letsencrypt/live" ]]; then
-    # Find the first certificate directory
+CERT_DOMAIN=""
+
+# Method 1: Extract cert path from nginx config
+NGINX_CERT_PATH=$(grep -oP 'ssl_certificate\s+\K[^;]+' /etc/nginx/conf.d/coldfront-app.conf 2>/dev/null | head -1)
+if [[ -n "${NGINX_CERT_PATH}" && -f "${NGINX_CERT_PATH}" ]]; then
+    CERT_FILE="${NGINX_CERT_PATH}"
+    CERT_DOMAIN="${SSL_TEST_DOMAIN}"
+fi
+
+# Method 2: Check letsencrypt live directory for domain-specific cert
+if [[ -z "${CERT_FILE}" && -n "${SSL_TEST_DOMAIN}" && -d "/etc/letsencrypt/live/${SSL_TEST_DOMAIN}" ]]; then
+    if [[ -f "/etc/letsencrypt/live/${SSL_TEST_DOMAIN}/fullchain.pem" ]]; then
+        CERT_FILE="/etc/letsencrypt/live/${SSL_TEST_DOMAIN}/fullchain.pem"
+        CERT_DOMAIN="${SSL_TEST_DOMAIN}"
+    fi
+fi
+
+# Method 3: Search all letsencrypt certs (requires sudo for /etc/letsencrypt/live)
+if [[ -z "${CERT_FILE}" && -d "/etc/letsencrypt/live" ]]; then
     for dir in /etc/letsencrypt/live/*/; do
         if [[ -f "${dir}fullchain.pem" ]]; then
             CERT_FILE="${dir}fullchain.pem"
             CERT_DOMAIN=$(basename "${dir%/}")
             break
         fi
-    done
+    done 2>/dev/null
 fi
 
 if [[ -n "${CERT_FILE}" && -f "${CERT_FILE}" ]]; then
@@ -179,7 +211,10 @@ if [[ -n "${CERT_FILE}" && -f "${CERT_FILE}" ]]; then
     fi
 else
     # Check if HTTPS is actually working even if we can't find the cert file
-    if curl -s -o /dev/null -w "%{http_code}" -k https://localhost/ 2>/dev/null | grep -qE "^(200|301|302)"; then
+    # Use domain from nginx config with Host header
+    CURL_DOMAIN="${SSL_TEST_DOMAIN:-localhost}"
+    HTTPS_TEST=$(curl -s -o /dev/null -w "%{http_code}" -k -H "Host: ${CURL_DOMAIN}" https://localhost/ 2>/dev/null || echo "000")
+    if echo "${HTTPS_TEST}" | grep -qE "^(200|301|302)"; then
         check_warn "SSL is working but certificate file not found in /etc/letsencrypt/live/"
     else
         check_fail "SSL certificate not found (run certbot)"
@@ -195,8 +230,16 @@ if [[ -f "/srv/coldfront/venv/bin/python" ]]; then
     # Try to import Django
     cd /srv/coldfront
     source venv/bin/activate
+    
+    # Load environment variables from coldfront.env
+    if [[ -f "/srv/coldfront/coldfront.env" ]]; then
+        set -a  # Export all variables
+        source /srv/coldfront/coldfront.env
+        set +a
+    fi
+    
     export DJANGO_SETTINGS_MODULE=local_settings
-    export PLUGIN_API=True
+    export PYTHONPATH=/srv/coldfront
     
     if python -c "import django; django.setup()" 2>/dev/null; then
         check_pass "Django configuration is valid"
@@ -233,7 +276,7 @@ echo ""
 echo "--- Web Response Test ---"
 if command -v curl &> /dev/null; then
     # Get domain from nginx config for proper Host header testing
-    TEST_DOMAIN=$(grep -oP 'server_name\s+\K[^;]+' /etc/nginx/conf.d/coldfront.conf 2>/dev/null | head -1 | awk '{print $1}')
+    TEST_DOMAIN=$(grep -oP 'server_name\s+\K[^;]+' /etc/nginx/conf.d/coldfront-app.conf 2>/dev/null | head -1 | awk '{print $1}')
     if [[ -z "${TEST_DOMAIN}" ]]; then
         TEST_DOMAIN="localhost"
     fi

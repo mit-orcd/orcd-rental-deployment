@@ -1,0 +1,38 @@
+{% extends "common/base.html" %}
+{% load static %}
+
+{# 
+Custom login page for ORCD Rental Portal
+
+Changes "Log in via OpenID Connect" to "Log in via MIT Touchstone"
+#}
+
+{% block title %}
+Login
+{% endblock %}
+
+{% block content %}
+<div class="card" id="login-card">
+  <div class="card-header">
+    <h2 class="text-center"><i class="fas fa-sign-in-alt"></i> Login</h2>
+  </div>
+  <div class="card-body">
+    <div class="row justify-content-center">
+      <div class="col-md-6 col-lg-4 text-center">
+        {# MIT Touchstone / OIDC Login Button #}
+        <a href="{% url 'oidc_authentication_init' %}" class="btn btn-primary btn-lg w-100">
+          <i class="fas fa-university"></i> Log in via MIT Touchstone
+        </a>
+        
+        <hr class="my-4">
+        
+        <p class="text-muted">
+          <small>
+            You will be redirected to authenticate with your MIT credentials.
+          </small>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

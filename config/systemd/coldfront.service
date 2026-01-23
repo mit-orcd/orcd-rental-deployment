@@ -21,9 +21,9 @@ Wants=redis6.service
 # =============================================================================
 # User and Group
 # =============================================================================
-# Run as ec2-user (or appropriate non-root user)
+# Run as the service user (defaults to ec2-user, override with SERVICE_USER env var)
 # nginx group allows socket access for reverse proxy
-User=ec2-user
+User={{SERVICE_USER}}
 Group=nginx
 
 # =============================================================================

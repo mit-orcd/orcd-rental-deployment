@@ -135,11 +135,36 @@ load_config() {
     SUPERUSER_NAME="${CFG_superuser_username:-admin}"
     SUPERUSER_EMAIL="${CFG_superuser_email:-$EMAIL}"
     SUPERUSER_PASSWORD="${CFG_superuser_password:-}"
-    GLOBUS_CLIENT_ID="${CFG_globus_client_id:-}"
-    GLOBUS_CLIENT_SECRET="${CFG_globus_client_secret:-}"
     PLUGIN_VERSION="${CFG_plugin_version:-main}"
     INSTANCE_NAME="${CFG_container_instance_name:-devcontainer}"
     SERVICE_USER="${CFG_container_service_user:-ec2-user}"
+    
+    # OIDC Configuration - supports both new oidc section and legacy globus section
+    # New oidc section takes precedence if present
+    if [ -n "${CFG_oidc_provider:-}" ]; then
+        # New OIDC configuration
+        OIDC_PROVIDER="${CFG_oidc_provider}"
+        OIDC_CLIENT_ID="${CFG_oidc_client_id:-}"
+        OIDC_CLIENT_SECRET="${CFG_oidc_client_secret:-}"
+        # Generic OIDC endpoints (only needed for provider=generic)
+        OIDC_AUTHORIZATION_ENDPOINT="${CFG_oidc_authorization_endpoint:-}"
+        OIDC_TOKEN_ENDPOINT="${CFG_oidc_token_endpoint:-}"
+        OIDC_USERINFO_ENDPOINT="${CFG_oidc_userinfo_endpoint:-}"
+        OIDC_JWKS_ENDPOINT="${CFG_oidc_jwks_endpoint:-}"
+    else
+        # Legacy globus configuration - default to globus provider
+        OIDC_PROVIDER="globus"
+        OIDC_CLIENT_ID="${CFG_globus_client_id:-}"
+        OIDC_CLIENT_SECRET="${CFG_globus_client_secret:-}"
+        OIDC_AUTHORIZATION_ENDPOINT=""
+        OIDC_TOKEN_ENDPOINT=""
+        OIDC_USERINFO_ENDPOINT=""
+        OIDC_JWKS_ENDPOINT=""
+    fi
+    
+    # Also set legacy vars for backward compatibility with other scripts
+    GLOBUS_CLIENT_ID="${OIDC_CLIENT_ID}"
+    GLOBUS_CLIENT_SECRET="${OIDC_CLIENT_SECRET}"
     
     # Deployment repo version - use config value or detect from host checkout
     if [ -n "${CFG_deployment_repo_version:-}" ]; then
@@ -154,8 +179,16 @@ load_config() {
     [ -z "$DOMAIN" ] && missing="$missing domain"
     [ -z "$EMAIL" ] && missing="$missing email"
     [ -z "$SUPERUSER_PASSWORD" ] && missing="$missing superuser.password"
-    [ -z "$GLOBUS_CLIENT_ID" ] && missing="$missing globus.client_id"
-    [ -z "$GLOBUS_CLIENT_SECRET" ] && missing="$missing globus.client_secret"
+    [ -z "$OIDC_CLIENT_ID" ] && missing="$missing oidc.client_id (or globus.client_id)"
+    [ -z "$OIDC_CLIENT_SECRET" ] && missing="$missing oidc.client_secret (or globus.client_secret)"
+    
+    # For generic OIDC, also require endpoints
+    if [ "$OIDC_PROVIDER" = "generic" ]; then
+        [ -z "$OIDC_AUTHORIZATION_ENDPOINT" ] && missing="$missing oidc.authorization_endpoint"
+        [ -z "$OIDC_TOKEN_ENDPOINT" ] && missing="$missing oidc.token_endpoint"
+        [ -z "$OIDC_USERINFO_ENDPOINT" ] && missing="$missing oidc.userinfo_endpoint"
+        [ -z "$OIDC_JWKS_ENDPOINT" ] && missing="$missing oidc.jwks_endpoint"
+    fi
     
     if [ -n "$missing" ]; then
         log_error "Missing required configuration fields:$missing"
@@ -167,6 +200,7 @@ load_config() {
     log_info "  Email: $EMAIL"
     log_info "  Instance: $INSTANCE_NAME"
     log_info "  Service User: $SERVICE_USER"
+    log_info "  OIDC Provider: $OIDC_PROVIDER"
     log_info "  Plugin Version: $PLUGIN_VERSION"
     log_info "  Deployment Repo Version: $DEPLOYMENT_REPO_VERSION"
 }
@@ -436,16 +470,36 @@ phase2_coldfront() {
 configure_secrets() {
     log_section "Section 6: Configuring Secrets"
     
-    log_info "Configuring Globus OIDC credentials"
+    log_info "Configuring OIDC credentials"
     log_info "  Domain: $DOMAIN"
-    log_info "  Globus Client ID: ${GLOBUS_CLIENT_ID:0:8}..."
+    log_info "  OIDC Provider: $OIDC_PROVIDER"
+    log_info "  Client ID: ${OIDC_CLIENT_ID:0:8}..."
+    
+    # Build environment variable exports for configure-secrets.sh
+    local env_exports="export DOMAIN_NAME='$DOMAIN' && \
+        export OIDC_PROVIDER='$OIDC_PROVIDER' && \
+        export OIDC_CLIENT_ID='$OIDC_CLIENT_ID' && \
+        export OIDC_CLIENT_SECRET='$OIDC_CLIENT_SECRET'"
+    
+    # For generic OIDC, also pass endpoint URLs
+    if [ "$OIDC_PROVIDER" = "generic" ]; then
+        log_info "  Authorization Endpoint: $OIDC_AUTHORIZATION_ENDPOINT"
+        env_exports="$env_exports && \
+            export OIDC_AUTHORIZATION_ENDPOINT='$OIDC_AUTHORIZATION_ENDPOINT' && \
+            export OIDC_TOKEN_ENDPOINT='$OIDC_TOKEN_ENDPOINT' && \
+            export OIDC_USERINFO_ENDPOINT='$OIDC_USERINFO_ENDPOINT' && \
+            export OIDC_JWKS_ENDPOINT='$OIDC_JWKS_ENDPOINT'"
+    fi
+    
+    # Also set legacy GLOBUS_* vars for backward compatibility
+    env_exports="$env_exports && \
+        export GLOBUS_CLIENT_ID='$OIDC_CLIENT_ID' && \
+        export GLOBUS_CLIENT_SECRET='$OIDC_CLIENT_SECRET'"
     
     # Run configure-secrets.sh with environment variables set
     # The script auto-detects when all env vars are set and runs non-interactively
     container_exec_user "cd ~/orcd-rental-deployment && \
-        export DOMAIN_NAME='$DOMAIN' && \
-        export GLOBUS_CLIENT_ID='$GLOBUS_CLIENT_ID' && \
-        export GLOBUS_CLIENT_SECRET='$GLOBUS_CLIENT_SECRET' && \
+        $env_exports && \
         ./scripts/configure-secrets.sh --non-interactive"
     
     log_success "Secrets and configuration files created"
