@@ -831,7 +831,64 @@ sudo journalctl -u coldfront -f
 sudo tail -f /var/log/nginx/error.log
 ```
 
-### 9.2 Log Locations
+### 9.2 Runtime Configuration Reload
+
+The ORCD plugin supports hot-reloading of certain configuration options without requiring a full service restart. This allows you to change plugin behavior while preserving active connections.
+
+#### Configuration File Location
+
+Runtime configuration is stored in `/srv/coldfront/plugin_config.yaml`. This file is created during installation from the template.
+
+#### Available Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `center_summary_enable` | bool | false | Show Center Summary link in navbar |
+| `home_page_allocations_enable` | bool | true | Show Allocations section on home page |
+| `auto_pi_enable` | bool | true | Automatically set `is_pi=True` for all users |
+| `auto_default_project_enable` | bool | true | Automatically create USERNAME_group project for new users |
+
+**Example configuration:**
+```yaml
+# /srv/coldfront/plugin_config.yaml
+center_summary_enable: false
+home_page_allocations_enable: true
+auto_pi_enable: true
+auto_default_project_enable: true
+```
+
+#### Applying Configuration Changes
+
+After editing the configuration file, apply changes without restarting:
+
+```bash
+# Edit the configuration
+sudo vim /srv/coldfront/plugin_config.yaml
+
+# Apply changes gracefully (no downtime)
+sudo systemctl reload coldfront
+
+# Verify the reload was successful
+sudo journalctl -u coldfront -n 20 | grep -i "reload\|sighup\|config"
+```
+
+**What happens during reload:**
+1. `systemctl reload` sends SIGHUP to the Gunicorn master process
+2. Gunicorn gracefully spawns new workers with updated configuration
+3. Old workers finish processing current requests before exiting
+4. The plugin re-reads `/srv/coldfront/plugin_config.yaml`
+5. New configuration takes effect within seconds
+
+#### Reload vs Restart
+
+| Operation | Command | Downtime | Use When |
+|-----------|---------|----------|----------|
+| **Reload** | `systemctl reload coldfront` | None | Changing plugin_config.yaml options |
+| **Restart** | `systemctl restart coldfront` | Brief | Code updates, Python package changes, local_settings.py changes |
+
+**Note:** Changes to `local_settings.py`, environment variables, or Python packages still require a full restart.
+
+### 9.3 Log Locations
 
 | Log | Location |
 |-----|----------|
@@ -841,7 +898,7 @@ sudo tail -f /var/log/nginx/error.log
 | Nginx access | `/var/log/nginx/access.log` |
 | Nginx error | `/var/log/nginx/error.log` |
 
-### 9.3 Database Backup
+### 9.4 Database Backup
 
 ```bash
 # Create backup
@@ -854,7 +911,7 @@ mkdir -p /srv/coldfront/backups
 echo "0 2 * * * cp /srv/coldfront/coldfront.db /srv/coldfront/backups/coldfront-\$(date +\%Y\%m\%d).db" | crontab -
 ```
 
-### 9.4 Upgrade Process
+### 9.5 Upgrade Process
 
 #### Checking for New Releases
 
@@ -894,7 +951,7 @@ sudo systemctl restart coldfront
 
 > **Note**: Always check the release notes before upgrading. Major version changes may require additional migration steps or configuration changes. See the plugin's `developer_docs/CHANGELOG.md` for details.
 
-### 9.5 SSL Certificate Renewal
+### 9.6 SSL Certificate Renewal
 
 Certbot handles automatic renewal. Verify it's working:
 
@@ -1059,6 +1116,7 @@ Session.objects.all().delete()  # Clears all sessions
 sudo systemctl start coldfront
 sudo systemctl stop coldfront
 sudo systemctl restart coldfront
+sudo systemctl reload coldfront  # Hot-reload plugin config (no downtime)
 
 # View logs
 sudo journalctl -u coldfront -f

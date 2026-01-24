@@ -9,6 +9,9 @@
 #   sudo systemctl enable coldfront
 #   sudo systemctl start coldfront
 #
+# To reload configuration without restarting:
+#   sudo systemctl reload coldfront
+#
 # =============================================================================
 
 [Unit]
@@ -66,6 +69,11 @@ ExecStart=/srv/coldfront/venv/bin/gunicorn \
     --error-logfile /srv/coldfront/gunicorn-error.log \
     --capture-output \
     wsgi:application
+
+# Graceful reload - sends HUP to Gunicorn master
+# This triggers worker reload and config re-read
+# Usage: systemctl reload coldfront
+ExecReload=/bin/kill -s HUP $MAINPID
 
 # =============================================================================
 # Service Behavior
