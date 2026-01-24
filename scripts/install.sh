@@ -263,6 +263,21 @@ copy_config_files() {
         -e "s/{{SERVICE_USER}}/${SERVICE_USER}/g" \
         "${CONFIG_DIR}/systemd/coldfront.service" > /etc/systemd/system/coldfront.service
     
+    # Copy plugin runtime configuration (only if not already present)
+    # This preserves any existing configuration on upgrades
+    if [[ ! -f "${APP_DIR}/plugin_config.yaml" ]]; then
+        if [[ -f "${CONFIG_DIR}/plugin_config.yaml.template" ]]; then
+            cp "${CONFIG_DIR}/plugin_config.yaml.template" "${APP_DIR}/plugin_config.yaml"
+            chown "${SERVICE_USER}:${SERVICE_USER}" "${APP_DIR}/plugin_config.yaml"
+            chmod 644 "${APP_DIR}/plugin_config.yaml"
+            log_info "Plugin configuration file created at ${APP_DIR}/plugin_config.yaml"
+        else
+            log_warn "Plugin config template not found: ${CONFIG_DIR}/plugin_config.yaml.template"
+        fi
+    else
+        log_info "Plugin configuration file already exists, preserving existing settings"
+    fi
+    
     log_info "Configuration files copied"
     log_info "Note: local_settings.py and coldfront.env must be created using configure-secrets.sh"
 }

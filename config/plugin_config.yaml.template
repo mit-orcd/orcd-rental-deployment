@@ -1,0 +1,52 @@
+# =============================================================================
+# ORCD Direct Charge Plugin - Runtime Configuration
+# =============================================================================
+#
+# This file controls runtime behavior of the ORCD Direct Charge plugin.
+#
+# Reload with: systemctl reload coldfront
+#
+# PRODUCTION DEFAULTS - These match current deployment behavior
+# (coldfront.service and coldfront.env.template set auto features to True)
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# UI Options
+# -----------------------------------------------------------------------------
+
+# Show Center Summary link in the navigation bar
+# Default: false - Center Summary is hidden in navbar
+center_summary_enable: false
+
+# Show Allocations section on the home page
+# Default: true - Users see their allocations on the home page
+home_page_allocations_enable: true
+
+# -----------------------------------------------------------------------------
+# Auto-configuration Features (PRODUCTION: enabled)
+# -----------------------------------------------------------------------------
+# These match current deployment settings in coldfront.service lines 50-52
+#
+# WARNING: These settings are IRREVERSIBLE once applied to user accounts
+# - auto_pi_enable: When true, all users automatically get is_pi=True
+# - auto_default_project_enable: When true, users get USERNAME_group project
+#
+# These are enabled in production deployments to allow all users to create
+# and manage their own projects without administrator intervention.
+# -----------------------------------------------------------------------------
+
+# Automatically set is_pi=True for all users
+# When enabled, every user can act as a Principal Investigator
+auto_pi_enable: true
+
+# Automatically create a default project (USERNAME_group) for each user
+# When enabled, users get their own project upon first login
+auto_default_project_enable: true
+
+# -----------------------------------------------------------------------------
+# Future Runtime Options
+# -----------------------------------------------------------------------------
+# Add new runtime-configurable options below this line.
+# After adding new options, update the plugin's config.py DEFAULT_CONFIG dict.
+# -----------------------------------------------------------------------------
