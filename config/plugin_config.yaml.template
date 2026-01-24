@@ -45,6 +45,17 @@ auto_pi_enable: true
 auto_default_project_enable: true
 
 # -----------------------------------------------------------------------------
+# Authentication Options
+# -----------------------------------------------------------------------------
+
+# Password Login Feature
+# When true, enables username/password login via /user/login?opt=password
+# The standard OIDC login remains available. This provides an alternative
+# authentication method for service accounts or users without OIDC credentials.
+# Default: false
+password_login_enable: false
+
+# -----------------------------------------------------------------------------
 # Future Runtime Options
 # -----------------------------------------------------------------------------
 # Add new runtime-configurable options below this line.
