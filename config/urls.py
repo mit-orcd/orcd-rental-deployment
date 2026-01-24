@@ -8,23 +8,28 @@
 #
 # =============================================================================
 
-from coldfront.config.urls import urlpatterns
+from coldfront.config.urls import urlpatterns as coldfront_urlpatterns
 from django.urls import path, include
 
-# Add OIDC authentication URLs
-# These provide:
-#   /oidc/authenticate/ - Initiates OIDC login flow
-#   /oidc/callback/     - Handles callback from OIDC provider
-#   /oidc/logout/       - OIDC logout
-urlpatterns += [
+# Build custom URL patterns - order matters for URL resolution
+# Plugin URLs that override ColdFront core views must come FIRST
+urlpatterns = [
+    # ORCD Direct Charge plugin URLs (FIRST - to allow overriding core URLs)
+    # These provide the rental portal, node management, billing, etc.
+    # The password login view at /user/login must be matched before ColdFront's login
+    path('', include('coldfront_orcd_direct_charge.urls')),
+
+    # OIDC authentication URLs
+    # These provide:
+    #   /oidc/authenticate/ - Initiates OIDC login flow
+    #   /oidc/callback/     - Handles callback from OIDC provider
+    #   /oidc/logout/       - OIDC logout
     path('oidc/', include('mozilla_django_oidc.urls')),
 ]
 
-# Add ORCD Direct Charge plugin URLs
-# These provide the rental portal, node management, billing, etc.
-urlpatterns += [
-    path('', include('coldfront_orcd_direct_charge.urls')),
-]
+# Add ColdFront core URLs after plugin URLs
+# This allows the plugin to override specific core URL patterns
+urlpatterns += coldfront_urlpatterns
 
 # Add django-su URLs (admin user switching)
 # This is used by ColdFront templates for the admin impersonation feature
