@@ -1,5 +1,9 @@
 # Ignore actual config files (they contain secrets)
 deploy-config.yaml
 
+# Ignore API token files (they contain secrets)
+api-tokens.env
+api-tokens.yaml
+
 # Keep the example file
 !deploy-config.yaml.example
