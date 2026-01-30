@@ -151,15 +151,8 @@ check_env_vars() {
         return 1
     fi
     
-    # For generic OIDC, also need endpoints
-    if [[ "${OIDC_PROVIDER}" == "generic" ]]; then
-        if [[ -z "${OIDC_AUTHORIZATION_ENDPOINT}" ]] || \
-           [[ -z "${OIDC_TOKEN_ENDPOINT}" ]] || \
-           [[ -z "${OIDC_USERINFO_ENDPOINT}" ]] || \
-           [[ -z "${OIDC_JWKS_ENDPOINT}" ]]; then
-            return 1
-        fi
-    fi
+    # For generic OIDC, endpoints are optional (MIT Okta is baked into template)
+    # Only client_id and client_secret are required.
     
     return 0  # All required vars set
 }
@@ -192,13 +185,9 @@ collect_inputs() {
         OIDC_CLIENT_SECRET="${OIDC_CLIENT_SECRET:-${GLOBUS_CLIENT_SECRET}}"
         
     elif [[ "${NON_INTERACTIVE}" == "true" ]]; then
-        log_error "Non-interactive mode requires all environment variables to be set:"
-        log_error "  Required: DOMAIN_NAME, OIDC_PROVIDER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET"
+        log_error "Non-interactive mode requires: DOMAIN_NAME, OIDC_PROVIDER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET"
         log_error "  (Or legacy: DOMAIN_NAME, GLOBUS_CLIENT_ID, GLOBUS_CLIENT_SECRET)"
-        log_error ""
-        log_error "  For generic OIDC, also required:"
-        log_error "    OIDC_AUTHORIZATION_ENDPOINT, OIDC_TOKEN_ENDPOINT,"
-        log_error "    OIDC_USERINFO_ENDPOINT, OIDC_JWKS_ENDPOINT"
+        log_error "  For generic OIDC, endpoints are optional (MIT Okta default)."
         log_error ""
         [[ -z "${DOMAIN_NAME}" ]] && log_error "  Missing: DOMAIN_NAME"
         [[ -z "${OIDC_PROVIDER}" ]] && [[ -z "${GLOBUS_CLIENT_ID}" ]] && log_error "  Missing: OIDC_PROVIDER (or GLOBUS_CLIENT_ID for legacy mode)"
