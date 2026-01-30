@@ -20,6 +20,7 @@ secrets/coldfront.env
 # Local configuration files (contain secrets)
 local_settings.py
 coldfront.env
+config/deploy-config.yaml
 
 # -----------------------------------------------------------------------------
 # Logs
@@ -34,8 +35,10 @@ logs/
 *.sqlite3
 
 # -----------------------------------------------------------------------------
-# Python
+# Python (allow scripts/lib for one-shot deploy helpers)
 # -----------------------------------------------------------------------------
+!scripts/lib/
+!scripts/lib/**
 __pycache__/
 *.py[cod]
 *$py.class
