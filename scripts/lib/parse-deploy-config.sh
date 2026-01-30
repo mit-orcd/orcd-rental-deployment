@@ -71,7 +71,10 @@ load_deploy_config() {
         _log_err "Deploy config not found: $config_file"
         return 1
     fi
-    eval "$(parse_yaml "$config_file" "CFG_")"
+    if ! eval "$(parse_yaml "$config_file" "CFG_")"; then
+        _log_err "Failed to parse deploy config (check YAML syntax, e.g. quotes in values)"
+        return 1
+    fi
 }
 
 # Write config/deployment.conf from CFG_* variables (set by load_deploy_config).

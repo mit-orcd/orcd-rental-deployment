@@ -33,6 +33,9 @@ REPO_DIR="$(dirname "${SCRIPT_DIR}")"
 CONFIG_DIR="${REPO_DIR}/config"
 APP_DIR="${APP_DIR:-/srv/coldfront}"
 
+# Show errors when a command fails (run before first log_* so trap is active)
+trap 'echo "[ERROR] init-db.sh failed at line $LINENO (exit code $?)"' ERR
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -60,7 +63,10 @@ load_deployment_conf() {
     local f="${CONFIG_DIR}/deployment.conf"
     if [[ -f "$f" ]]; then
         # shellcheck source=/dev/null
-        source "$f"
+        if ! source "$f"; then
+            log_error "Failed to source ${f} (check syntax, e.g. unescaped quotes)"
+            exit 1
+        fi
         [[ -n "${APP_DIR}" ]] && export APP_DIR
     fi
 }
@@ -68,8 +74,15 @@ load_deployment_conf() {
 # Load superuser and optional APP_DIR from deploy-config.yaml
 load_config_file() {
     local config_path="$1"
+    if [[ ! -f "${SCRIPT_DIR}/lib/parse-deploy-config.sh" ]]; then
+        log_error "lib/parse-deploy-config.sh not found (run from repo root)"
+        exit 1
+    fi
     source "${SCRIPT_DIR}/lib/parse-deploy-config.sh"
-    load_deploy_config "$config_path"
+    if ! load_deploy_config "$config_path"; then
+        log_error "Failed to load deploy config from ${config_path}"
+        exit 1
+    fi
     export SUPERUSER_USERNAME="${CFG_superuser_username:-admin}"
     export SUPERUSER_EMAIL="${CFG_superuser_email}"
     export SUPERUSER_PASSWORD="${CFG_superuser_password}"
@@ -92,6 +105,8 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+log_info "Starting database initialization..."
 
 load_deployment_conf
 
@@ -119,7 +134,10 @@ if [[ ! -f "${APP_DIR}/coldfront.env" ]]; then
 fi
 
 run_django() {
-    bash -c "${COLDFRONT_DIR} && ${VENV_ACTIVATE} && ${LOAD_ENV} && ${DJANGO_ENV} && $*"
+    if ! bash -c "${COLDFRONT_DIR} && ${VENV_ACTIVATE} && ${LOAD_ENV} && ${DJANGO_ENV} && $*"; then
+        log_error "Command failed: $*"
+        return 1
+    fi
 }
 
 log_info "Running database migrations..."
