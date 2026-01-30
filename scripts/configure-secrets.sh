@@ -28,6 +28,9 @@
 #   export OIDC_JWKS_ENDPOINT="https://okta.mit.edu/oauth2/v1/keys"
 #   ./configure-secrets.sh --non-interactive
 #
+#   # Non-interactive with deploy-config.yaml (one-shot deployment):
+#   ./configure-secrets.sh --config config/deploy-config.yaml
+#
 #   # Legacy mode (backward compatible - auto-detects Globus):
 #   export DOMAIN_NAME="rental.mit-orcd.org"
 #   export GLOBUS_CLIENT_ID="your-client-id"
@@ -480,6 +483,7 @@ show_help() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
     echo "Options:"
+    echo "  --config PATH        Load inputs from deploy-config.yaml (non-interactive)"
     echo "  --non-interactive    Run without prompts (requires env vars)"
     echo "  -h, --help          Show this help message"
     echo ""
@@ -501,16 +505,49 @@ show_help() {
     echo "    GLOBUS_CLIENT_ID     Maps to OIDC_CLIENT_ID, implies OIDC_PROVIDER=globus"
     echo "    GLOBUS_CLIENT_SECRET Maps to OIDC_CLIENT_SECRET"
     echo ""
+    echo "  --config PATH: Load domain, OIDC, etc. from deploy-config.yaml."
+    echo ""
     echo "If all required environment variables are set, the script will automatically"
     echo "run in non-interactive mode without requiring the --non-interactive flag."
 }
 
+load_config_file() {
+    local config_path="$1"
+    local script_dir_here
+    script_dir_here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [[ ! -f "${script_dir_here}/lib/parse-deploy-config.sh" ]]; then
+        log_error "lib/parse-deploy-config.sh not found (run from repo root)"
+        exit 1
+    fi
+    source "${script_dir_here}/lib/parse-deploy-config.sh"
+    load_deploy_config "$config_path"
+    export DOMAIN_NAME="${CFG_domain}"
+    export OIDC_PROVIDER="${CFG_oidc_provider:-globus}"
+    export OIDC_CLIENT_ID="${CFG_oidc_client_id}"
+    export OIDC_CLIENT_SECRET="${CFG_oidc_client_secret}"
+    export GLOBUS_CLIENT_ID="${CFG_oidc_client_id}"
+    export GLOBUS_CLIENT_SECRET="${CFG_oidc_client_secret}"
+    if [[ "${OIDC_PROVIDER}" == "generic" ]]; then
+        export OIDC_AUTHORIZATION_ENDPOINT="${CFG_oidc_authorization_endpoint}"
+        export OIDC_TOKEN_ENDPOINT="${CFG_oidc_token_endpoint}"
+        export OIDC_USERINFO_ENDPOINT="${CFG_oidc_userinfo_endpoint}"
+        export OIDC_JWKS_ENDPOINT="${CFG_oidc_jwks_endpoint}"
+    fi
+    log_info "Loaded config from ${config_path}"
+}
+
 main() {
     local NON_INTERACTIVE=false
+    local CONFIG_FILE=""
     
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
+            --config)
+                CONFIG_FILE="$2"
+                NON_INTERACTIVE=true
+                shift 2
+                ;;
             --non-interactive)
                 NON_INTERACTIVE=true
                 shift
@@ -526,6 +563,15 @@ main() {
                 ;;
         esac
     done
+    
+    # Load from config file if given
+    if [[ -n "${CONFIG_FILE}" ]]; then
+        if [[ ! -f "${CONFIG_FILE}" ]]; then
+            log_error "Config file not found: ${CONFIG_FILE}"
+            exit 1
+        fi
+        load_config_file "${CONFIG_FILE}"
+    fi
     
     # Check if we can access the app directory
     if [[ ! -d "${APP_DIR}" ]]; then
