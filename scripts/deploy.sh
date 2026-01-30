@@ -112,12 +112,8 @@ missing=""
 [[ -z "$SUPERUSER_EMAIL" ]]  && missing="$missing superuser.email"
 [[ -z "$SUPERUSER_PASSWORD" ]] && missing="$missing superuser.password"
 
-if [[ "$OIDC_PROVIDER" == "generic" ]]; then
-    [[ -z "${CFG_oidc_authorization_endpoint}" ]] && missing="$missing oidc.authorization_endpoint"
-    [[ -z "${CFG_oidc_token_endpoint}" ]]         && missing="$missing oidc.token_endpoint"
-    [[ -z "${CFG_oidc_userinfo_endpoint}" ]]     && missing="$missing oidc.userinfo_endpoint"
-    [[ -z "${CFG_oidc_jwks_endpoint}" ]]          && missing="$missing oidc.jwks_endpoint"
-fi
+# Generic OIDC: endpoints are optional. If omitted, local_settings.generic.py.template
+# is used as-is (MIT Okta baked in). Set them only to override (e.g. different Okta tenant).
 
 if [[ -n "$missing" ]]; then
     log_error "Missing required config fields:$missing"

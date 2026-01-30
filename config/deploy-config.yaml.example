@@ -18,12 +18,14 @@ email: "admin@example.com"
 # OIDC Authentication (required)
 # -----------------------------------------------------------------------------
 # provider: "globus" or "generic"
-# For generic (Okta, Keycloak, Azure AD): also set the four endpoints below.
+# For generic: client_id and client_secret are required. Endpoints are optional:
+#   - If omitted, MIT Okta is used (baked into local_settings.generic.py.template).
+#   - Set the four endpoints only to use a different provider (e.g. another Okta tenant).
 oidc:
   provider: "globus"
   client_id: "your-client-id"
   client_secret: "your-client-secret"
-  # Generic OIDC only (required when provider: generic):
+  # Optional: override endpoints (only if not using default MIT Okta)
   # authorization_endpoint: "https://okta.example.com/oauth2/v1/authorize"
   # token_endpoint: "https://okta.example.com/oauth2/v1/token"
   # userinfo_endpoint: "https://okta.example.com/oauth2/v1/userinfo"

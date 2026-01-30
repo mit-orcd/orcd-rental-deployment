@@ -33,10 +33,6 @@ When using **one-shot deployment** (`scripts/deploy.sh`), all inputs are read fr
 | `oidc.provider` | `globus` or `generic`. |
 | `oidc.client_id` | OAuth client ID. |
 | `oidc.client_secret` | OAuth client secret. |
-| `oidc.authorization_endpoint` | (Generic only.) Authorization URL. |
-| `oidc.token_endpoint` | (Generic only.) Token URL. |
-| `oidc.userinfo_endpoint` | (Generic only.) UserInfo URL. |
-| `oidc.jwks_endpoint` | (Generic only.) JWKS URL. |
 | `superuser.username` | ColdFront admin username. |
 | `superuser.email` | ColdFront admin email. |
 | `superuser.password` | ColdFront admin password (non-interactive `createsuperuser`). |
@@ -55,6 +51,10 @@ When using **one-shot deployment** (`scripts/deploy.sh`), all inputs are read fr
 | `skip_nginx` | `false` | Skip Nginx/SSL step in prereqs. |
 | `skip_f2b` | `false` | Skip fail2ban in prereqs. |
 | `skip_ssl` | `false` | Skip SSL in nginx base (testing). |
+| `oidc.authorization_endpoint` | (optional) | Generic OIDC override. If omitted, MIT Okta is used (baked into template). |
+| `oidc.token_endpoint` | (optional) | Generic OIDC override. |
+| `oidc.userinfo_endpoint` | (optional) | Generic OIDC override. |
+| `oidc.jwks_endpoint` | (optional) | Generic OIDC override. |
 
 ### Example
 

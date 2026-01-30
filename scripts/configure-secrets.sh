@@ -495,11 +495,8 @@ show_help() {
     echo "    OIDC_CLIENT_ID       OAuth Client ID"
     echo "    OIDC_CLIENT_SECRET   OAuth Client Secret"
     echo ""
-    echo "  For generic OIDC providers (Okta, Keycloak, etc.), also required:"
-    echo "    OIDC_AUTHORIZATION_ENDPOINT  Authorization endpoint URL"
-    echo "    OIDC_TOKEN_ENDPOINT          Token endpoint URL"
-    echo "    OIDC_USERINFO_ENDPOINT       UserInfo endpoint URL"
-    echo "    OIDC_JWKS_ENDPOINT           JWKS endpoint URL"
+    echo "  For generic OIDC (optional – default is MIT Okta baked into template):"
+    echo "    OIDC_AUTHORIZATION_ENDPOINT  OIDC_TOKEN_ENDPOINT  OIDC_USERINFO_ENDPOINT  OIDC_JWKS_ENDPOINT"
     echo ""
     echo "  Legacy (backward compatibility):"
     echo "    GLOBUS_CLIENT_ID     Maps to OIDC_CLIENT_ID, implies OIDC_PROVIDER=globus"
@@ -527,11 +524,12 @@ load_config_file() {
     export OIDC_CLIENT_SECRET="${CFG_oidc_client_secret}"
     export GLOBUS_CLIENT_ID="${CFG_oidc_client_id}"
     export GLOBUS_CLIENT_SECRET="${CFG_oidc_client_secret}"
+    # Generic OIDC: only export endpoints if set (otherwise template uses baked-in MIT Okta)
     if [[ "${OIDC_PROVIDER}" == "generic" ]]; then
-        export OIDC_AUTHORIZATION_ENDPOINT="${CFG_oidc_authorization_endpoint}"
-        export OIDC_TOKEN_ENDPOINT="${CFG_oidc_token_endpoint}"
-        export OIDC_USERINFO_ENDPOINT="${CFG_oidc_userinfo_endpoint}"
-        export OIDC_JWKS_ENDPOINT="${CFG_oidc_jwks_endpoint}"
+        [[ -n "${CFG_oidc_authorization_endpoint}" ]] && export OIDC_AUTHORIZATION_ENDPOINT="${CFG_oidc_authorization_endpoint}"
+        [[ -n "${CFG_oidc_token_endpoint}" ]]         && export OIDC_TOKEN_ENDPOINT="${CFG_oidc_token_endpoint}"
+        [[ -n "${CFG_oidc_userinfo_endpoint}" ]]      && export OIDC_USERINFO_ENDPOINT="${CFG_oidc_userinfo_endpoint}"
+        [[ -n "${CFG_oidc_jwks_endpoint}" ]]         && export OIDC_JWKS_ENDPOINT="${CFG_oidc_jwks_endpoint}"
     fi
     log_info "Loaded config from ${config_path}"
 }
