@@ -86,7 +86,9 @@ load_config_file() {
     export SUPERUSER_USERNAME="${CFG_superuser_username:-admin}"
     export SUPERUSER_EMAIL="${CFG_superuser_email}"
     export SUPERUSER_PASSWORD="${CFG_superuser_password}"
-    [[ -n "${CFG_app_dir}" ]] && export APP_DIR="${CFG_app_dir}"
+    if [[ -n "${CFG_app_dir}" ]]; then
+        export APP_DIR="${CFG_app_dir}"
+    fi
 }
 
 CONFIG_FILE=""
