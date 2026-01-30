@@ -1,0 +1,62 @@
+# =============================================================================
+# ORCD Rental Portal - One-Shot Deployment Configuration
+# =============================================================================
+# Copy to deploy-config.yaml and fill in your values.
+# Used by: scripts/deploy.sh (one-shot deployment)
+# DO NOT commit deploy-config.yaml (it contains secrets).
+#
+# See config/README.md for full schema and required vs optional fields.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Domain and Email (required)
+# -----------------------------------------------------------------------------
+domain: "your-domain.example.com"
+email: "admin@example.com"
+
+# -----------------------------------------------------------------------------
+# OIDC Authentication (required)
+# -----------------------------------------------------------------------------
+# provider: "globus" or "generic"
+# For generic: client_id and client_secret are required. Endpoints are optional:
+#   - If omitted, MIT Okta is used (baked into local_settings.generic.py.template).
+#   - Set the four endpoints only to use a different provider (e.g. another Okta tenant).
+oidc:
+  provider: "globus"
+  client_id: "your-client-id"
+  client_secret: "your-client-secret"
+  # Optional: override endpoints (only if not using default MIT Okta)
+  # authorization_endpoint: "https://okta.example.com/oauth2/v1/authorize"
+  # token_endpoint: "https://okta.example.com/oauth2/v1/token"
+  # userinfo_endpoint: "https://okta.example.com/oauth2/v1/userinfo"
+  # jwks_endpoint: "https://okta.example.com/oauth2/v1/keys"
+
+# -----------------------------------------------------------------------------
+# Superuser (required for non-interactive DB init)
+# -----------------------------------------------------------------------------
+superuser:
+  username: "admin"
+  email: "admin@example.com"
+  password: "CHANGE_THIS_PASSWORD"
+
+# -----------------------------------------------------------------------------
+# Optional: Plugin and ColdFront versions
+# -----------------------------------------------------------------------------
+# plugin_version: "v0.1"
+# coldfront_version: "coldfront[common]"
+# plugin_repo: "https://github.com/mit-orcd/cf-orcd-rental.git"
+
+# -----------------------------------------------------------------------------
+# Optional: Paths and service user (defaults match deployment.conf.template)
+# -----------------------------------------------------------------------------
+# app_dir: "/srv/coldfront"
+# venv_dir: "/srv/coldfront/venv"
+# service_user: "ec2-user"
+# service_group: "nginx"
+
+# -----------------------------------------------------------------------------
+# Optional: Skip phases (for container / re-run when infra already exists)
+# -----------------------------------------------------------------------------
+# skip_nginx: false   # Skip install_prereqs nginx/SSL step
+# skip_f2b: false     # Skip fail2ban in install_prereqs
+# skip_ssl: false     # Skip SSL in install_nginx_base (testing only)

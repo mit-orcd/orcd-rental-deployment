@@ -12,18 +12,16 @@ from coldfront.config.urls import urlpatterns
 from django.urls import path, include
 
 # -----------------------------------------------------------------------------
-# Password Login Override
+# Password Login Override (optional - plugin must provide views.auth)
 # -----------------------------------------------------------------------------
-# Insert the password login URL at the BEGINNING of urlpatterns.
-# This must come before ColdFront's /user/login/ to handle ?opt=password.
-#
-# Note: ColdFront has /user/login/ (with trailing slash), and Django's
-# APPEND_SLASH would redirect /user/login to /user/login/ if no match exists.
-# By inserting our /user/login (no trailing slash) first, it matches before
-# the redirect can occur.
+# Insert the password login URL at the BEGINNING of urlpatterns when the
+# plugin provides PasswordLoginView. Older plugin versions may not have it.
 # -----------------------------------------------------------------------------
-from coldfront_orcd_direct_charge.views.auth import PasswordLoginView
-urlpatterns.insert(0, path('user/login', PasswordLoginView.as_view(), name='password-login'))
+try:
+    from coldfront_orcd_direct_charge.views.auth import PasswordLoginView
+    urlpatterns.insert(0, path('user/login', PasswordLoginView.as_view(), name='password-login'))
+except (ImportError, AttributeError):
+    pass  # Plugin version does not provide password login view
 
 # Add OIDC authentication URLs
 # These provide:
