@@ -359,37 +359,33 @@ generate_coldfront_env() {
     
     # Build database settings block based on engine type
     local db_engine="${DB_ENGINE:-sqlite}"
-    local db_postgres_settings=""
-    
-    if [[ "${db_engine}" == "postgres" ]]; then
-        # PostgreSQL mode: include all connection settings
-        db_postgres_settings="DB_NAME=${DB_NAME:-rentals}
-DB_USER=${DB_USER}
-DB_PASSWORD=${DB_PASSWORD}
-DB_HOST=${DB_HOST}
-DB_PORT=${DB_PORT:-5432}"
-        log_info "Database: PostgreSQL (${DB_HOST})"
-    else
-        # SQLite mode: comment out PostgreSQL settings
-        db_postgres_settings="# PostgreSQL settings (only used when DB_ENGINE=postgres)
-#DB_NAME=rentals
-#DB_USER=
-#DB_PASSWORD=
-#DB_HOST=
-#DB_PORT=5432"
-        log_info "Database: SQLite (/srv/coldfront/coldfront.db)"
-    fi
     
     # Save a copy in secrets directory first (always works)
     # Note: The template includes PLUGIN_API, AUTO_PI_ENABLE, and AUTO_DEFAULT_PROJECT_ENABLE
     # These are critical for ColdFront to load rest_framework.authtoken during startup
     mkdir -p "${SECRETS_DIR}"
+    
+    # First pass: substitute single-line placeholders
     sed -e "s|{{SECRET_KEY}}|${SECRET_KEY}|g" \
         -e "s|{{OIDC_CLIENT_ID}}|${OIDC_CLIENT_ID}|g" \
         -e "s|{{OIDC_CLIENT_SECRET}}|${OIDC_CLIENT_SECRET}|g" \
         -e "s|{{DB_ENGINE}}|${db_engine}|g" \
-        "${TEMPLATE}" | sed -e "s|{{DB_POSTGRES_SETTINGS}}|${db_postgres_settings}|g" \
-        > "${SECRETS_COPY}"
+        "${TEMPLATE}" > "${SECRETS_COPY}.tmp"
+    
+    # Second pass: replace multi-line DB_POSTGRES_SETTINGS placeholder
+    # Use awk for reliable multi-line replacement
+    if [[ "${db_engine}" == "postgres" ]]; then
+        log_info "Database: PostgreSQL (${DB_HOST})"
+        awk -v name="${DB_NAME:-rentals}" -v user="${DB_USER}" -v pass="${DB_PASSWORD}" \
+            -v host="${DB_HOST}" -v port="${DB_PORT:-5432}" \
+            '{gsub(/\{\{DB_POSTGRES_SETTINGS\}\}/, "DB_NAME=" name "\nDB_USER=" user "\nDB_PASSWORD=" pass "\nDB_HOST=" host "\nDB_PORT=" port); print}' \
+            "${SECRETS_COPY}.tmp" > "${SECRETS_COPY}"
+    else
+        log_info "Database: SQLite (/srv/coldfront/coldfront.db)"
+        awk '{gsub(/\{\{DB_POSTGRES_SETTINGS\}\}/, "# PostgreSQL settings (only used when DB_ENGINE=postgres)\n#DB_NAME=rentals\n#DB_USER=\n#DB_PASSWORD=\n#DB_HOST=\n#DB_PORT=5432"); print}' \
+            "${SECRETS_COPY}.tmp" > "${SECRETS_COPY}"
+    fi
+    rm -f "${SECRETS_COPY}.tmp"
     chmod 600 "${SECRETS_COPY}"
     log_info "Backup created: ${SECRETS_COPY}"
     log_info "Plugin env vars included: PLUGIN_API, AUTO_PI_ENABLE, AUTO_DEFAULT_PROJECT_ENABLE"
