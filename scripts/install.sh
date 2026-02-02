@@ -221,7 +221,7 @@ install_coldfront() {
     
     log_info "Installing ColdFront: ${COLDFRONT_VERSION}..."
     sudo -u "${SERVICE_USER}" "${VENV_DIR}/bin/pip" install "${COLDFRONT_VERSION}"
-    sudo -u "${SERVICE_USER}" "${VENV_DIR}/bin/pip" install gunicorn mozilla-django-oidc pyjwt requests
+    sudo -u "${SERVICE_USER}" "${VENV_DIR}/bin/pip" install gunicorn mozilla-django-oidc pyjwt requests psycopg2-binary
     
     log_info "Installing ORCD Direct Charge plugin: ${PLUGIN_VERSION} from ${PLUGIN_REPO}..."
     # Use --no-cache-dir to ensure we always fetch the latest commit for branch references
