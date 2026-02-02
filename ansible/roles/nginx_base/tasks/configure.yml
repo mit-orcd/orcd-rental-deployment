@@ -90,7 +90,7 @@
     state: started
     enabled: true
 
-- name: Verify nginx is responding
+- name: Verify nginx is responding (placeholder page)
   ansible.builtin.uri:
     url: "http://127.0.0.1/"
     headers:
@@ -101,7 +101,13 @@
   retries: 3
   delay: 2
   until: nginx_health.status == 200
+  when: not ssl_cert_exists.stat.exists
+
+- name: Verify nginx is running (when SSL already configured)
+  ansible.builtin.command: systemctl is-active nginx
+  changed_when: false
+  when: ssl_cert_exists.stat.exists
 
 - name: Display nginx status
   ansible.builtin.debug:
-    msg: "Nginx is running and responding on port 80 for {{ domain_name }}"
+    msg: "{{ 'Nginx is running and responding on port 80 for ' ~ domain_name if not ssl_cert_exists.stat.exists else 'Nginx is running (SSL already configured)' }}"
