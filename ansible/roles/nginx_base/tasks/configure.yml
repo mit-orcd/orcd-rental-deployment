@@ -28,6 +28,11 @@
     group: root
     mode: '0644'
 
+- name: Check if SSL certificate already exists
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ domain_name }}/fullchain.pem"
+  register: ssl_cert_exists
+
 - name: Determine nginx config path
   ansible.builtin.set_fact:
     nginx_config_file: "{{ nginx_conf_dir }}/placeholder.conf"
@@ -40,13 +45,32 @@
     group: root
     mode: '0644'
   notify: Reload nginx
+  when: not ssl_cert_exists.stat.exists
+
+- name: Remove placeholder config if SSL already configured
+  ansible.builtin.file:
+    path: "{{ nginx_config_file }}"
+    state: absent
+  when: ssl_cert_exists.stat.exists
+  notify: Reload nginx
 
 - name: Create symlink in sites-enabled (Debian)
   ansible.builtin.file:
     src: "{{ nginx_config_file }}"
     dest: "/etc/nginx/sites-enabled/placeholder.conf"
     state: link
-  when: ansible_os_family == 'Debian'
+  when: 
+    - ansible_os_family == 'Debian'
+    - not ssl_cert_exists.stat.exists
+  notify: Reload nginx
+
+- name: Remove placeholder symlink if SSL configured (Debian)
+  ansible.builtin.file:
+    path: "/etc/nginx/sites-enabled/placeholder.conf"
+    state: absent
+  when:
+    - ansible_os_family == 'Debian'
+    - ssl_cert_exists.stat.exists
   notify: Reload nginx
 
 - name: Remove default RHEL nginx config if present
