@@ -333,7 +333,8 @@ generate_local_settings() {
     
     # Try to copy to app directory (may need sudo)
     if cp "${SECRETS_COPY}" "${OUTPUT}" 2>/dev/null; then
-        chown "${SERVICE_USER}:${SERVICE_USER}" "${OUTPUT}" 2>/dev/null || sudo chown "${SERVICE_USER}:${SERVICE_USER}" "${OUTPUT}"
+        log_info "Setting ownership to ${SERVICE_USER}:${SERVICE_USER}"
+        chown "${SERVICE_USER}:${SERVICE_USER}" "${OUTPUT}" || sudo chown "${SERVICE_USER}:${SERVICE_USER}" "${OUTPUT}"
         chmod 600 "${OUTPUT}"
         log_info "Created: ${OUTPUT}"
     else
@@ -363,7 +364,7 @@ generate_coldfront_env() {
     
     # Save a copy in secrets directory first (always works)
     # Note: The template includes PLUGIN_API, AUTO_PI_ENABLE, and AUTO_DEFAULT_PROJECT_ENABLE
-    # These are critical for ColdFront to load rest_framework.authtoken during startup
+    # These are critical forol
     mkdir -p "${SECRETS_DIR}"
     
     # First pass: substitute single-line placeholders
@@ -393,7 +394,8 @@ generate_coldfront_env() {
     
     # Try to copy to app directory (may need sudo)
     if cp "${SECRETS_COPY}" "${OUTPUT}" 2>/dev/null; then
-        chown "${SERVICE_USER}:${SERVICE_USER}" "${OUTPUT}" 2>/dev/null || sudo chown "${SERVICE_USER}:${SERVICE_USER}" "${OUTPUT}"
+        log_info "Setting ownership to ${SERVICE_USER}:${SERVICE_USER}"
+        chown "${SERVICE_USER}:${SERVICE_USER}" "${OUTPUT}" || sudo chown "${SERVICE_USER}:${SERVICE_USER}" "${OUTPUT}"
         chmod 600 "${OUTPUT}"
         log_info "Created: ${OUTPUT}"
     else
