@@ -275,6 +275,17 @@ collect_inputs() {
     echo "  Client Secret: ****${OIDC_CLIENT_SECRET: -4}"
     echo "  Secret Key:    ${SECRET_KEY:0:20}..."
     echo ""
+    echo "Database settings:"
+    if [[ "${DB_ENGINE:-sqlite}" == "postgres" ]]; then
+        echo "  Engine:        PostgreSQL"
+        echo "  Host:          ${DB_HOST}"
+        echo "  Database:      ${DB_NAME:-rentals}"
+        echo "  User:          ${DB_USER}"
+    else
+        echo "  Engine:        SQLite"
+        echo "  Path:          /srv/coldfront/coldfront.db"
+    fi
+    echo ""
     echo "Plugin settings (from template):"
     echo "  PLUGIN_API=True"
     echo "  AUTO_PI_ENABLE=True"
@@ -346,6 +357,29 @@ generate_coldfront_env() {
     
     log_info "Generating coldfront.env..."
     
+    # Build database settings block based on engine type
+    local db_engine="${DB_ENGINE:-sqlite}"
+    local db_postgres_settings=""
+    
+    if [[ "${db_engine}" == "postgres" ]]; then
+        # PostgreSQL mode: include all connection settings
+        db_postgres_settings="DB_NAME=${DB_NAME:-rentals}
+DB_USER=${DB_USER}
+DB_PASSWORD=${DB_PASSWORD}
+DB_HOST=${DB_HOST}
+DB_PORT=${DB_PORT:-5432}"
+        log_info "Database: PostgreSQL (${DB_HOST})"
+    else
+        # SQLite mode: comment out PostgreSQL settings
+        db_postgres_settings="# PostgreSQL settings (only used when DB_ENGINE=postgres)
+#DB_NAME=rentals
+#DB_USER=
+#DB_PASSWORD=
+#DB_HOST=
+#DB_PORT=5432"
+        log_info "Database: SQLite (/srv/coldfront/coldfront.db)"
+    fi
+    
     # Save a copy in secrets directory first (always works)
     # Note: The template includes PLUGIN_API, AUTO_PI_ENABLE, and AUTO_DEFAULT_PROJECT_ENABLE
     # These are critical for ColdFront to load rest_framework.authtoken during startup
@@ -353,7 +387,9 @@ generate_coldfront_env() {
     sed -e "s|{{SECRET_KEY}}|${SECRET_KEY}|g" \
         -e "s|{{OIDC_CLIENT_ID}}|${OIDC_CLIENT_ID}|g" \
         -e "s|{{OIDC_CLIENT_SECRET}}|${OIDC_CLIENT_SECRET}|g" \
-        "${TEMPLATE}" > "${SECRETS_COPY}"
+        -e "s|{{DB_ENGINE}}|${db_engine}|g" \
+        "${TEMPLATE}" | sed -e "s|{{DB_POSTGRES_SETTINGS}}|${db_postgres_settings}|g" \
+        > "${SECRETS_COPY}"
     chmod 600 "${SECRETS_COPY}"
     log_info "Backup created: ${SECRETS_COPY}"
     log_info "Plugin env vars included: PLUGIN_API, AUTO_PI_ENABLE, AUTO_DEFAULT_PROJECT_ENABLE"
@@ -519,6 +555,15 @@ load_config_file() {
         [[ -n "${CFG_oidc_token_endpoint}" ]]         && export OIDC_TOKEN_ENDPOINT="${CFG_oidc_token_endpoint}"
         [[ -n "${CFG_oidc_userinfo_endpoint}" ]]      && export OIDC_USERINFO_ENDPOINT="${CFG_oidc_userinfo_endpoint}"
         [[ -n "${CFG_oidc_jwks_endpoint}" ]]         && export OIDC_JWKS_ENDPOINT="${CFG_oidc_jwks_endpoint}"
+    fi
+    # Database configuration (sqlite is default if not specified)
+    export DB_ENGINE="${CFG_database_engine:-sqlite}"
+    if [[ "${DB_ENGINE}" == "postgres" ]]; then
+        export DB_NAME="${CFG_database_name:-rentals}"
+        export DB_USER="${CFG_database_user}"
+        export DB_PASSWORD="${CFG_database_password}"
+        export DB_HOST="${CFG_database_host}"
+        export DB_PORT="${CFG_database_port:-5432}"
     fi
     log_info "Loaded config from ${config_path}"
 }

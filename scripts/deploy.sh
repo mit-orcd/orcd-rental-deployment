@@ -218,9 +218,16 @@ fi
 # Permissions and service
 if run_phase 6; then
 log_section "Phase 6: Permissions and Service"
-if [[ -f "${APP_DIR}/coldfront.db" ]]; then
-    chown "${SERVICE_USER}:${SERVICE_USER}" "${APP_DIR}/coldfront.db"
-    chmod 664 "${APP_DIR}/coldfront.db"
+# Database file permissions (only for SQLite mode)
+DB_ENGINE="${CFG_database_engine:-sqlite}"
+if [[ "${DB_ENGINE}" == "sqlite" ]]; then
+    if [[ -f "${APP_DIR}/coldfront.db" ]]; then
+        chown "${SERVICE_USER}:${SERVICE_USER}" "${APP_DIR}/coldfront.db"
+        chmod 664 "${APP_DIR}/coldfront.db"
+        log_info "SQLite database permissions set"
+    fi
+else
+    log_info "Using PostgreSQL - no local database file to configure"
 fi
 if [[ -d "${APP_DIR}/static" ]]; then
     chown -R "${SERVICE_USER}:${SERVICE_USER}" "${APP_DIR}/static"

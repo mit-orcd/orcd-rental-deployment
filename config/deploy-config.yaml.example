@@ -55,6 +55,23 @@ superuser:
 # service_group: "nginx"
 
 # -----------------------------------------------------------------------------
+# Optional: Database Configuration
+# -----------------------------------------------------------------------------
+# engine: "sqlite" (default) or "postgres"
+# For postgres, set the connection details below.
+# Credentials for AWS RDS are stored in Secrets Manager (secret: ORCD_DBA).
+#   Get RDS endpoint: tofu output -raw rds_address (from orcd-opentofu-aws)
+#   Get credentials: aws secretsmanager get-secret-value --secret-id ORCD_DBA
+#
+# database:
+#   engine: "postgres"
+#   name: "rentals"
+#   user: "your-db-user"
+#   password: "your-db-password"
+#   host: "your-rds-endpoint.region.rds.amazonaws.com"
+#   port: "5432"
+
+# -----------------------------------------------------------------------------
 # Optional: Skip phases (for container / re-run when infra already exists)
 # -----------------------------------------------------------------------------
 # skip_nginx: false   # Skip install_prereqs nginx/SSL step
