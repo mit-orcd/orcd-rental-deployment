@@ -68,25 +68,32 @@ ALLOWED_HOSTS = ['{{DOMAIN_NAME}}', 'localhost', '127.0.0.1']
 # =============================================================================
 # DATABASE
 # =============================================================================
+# Set DB_ENGINE=postgres for AWS RDS PostgreSQL, or DB_ENGINE=sqlite (default)
+# for local SQLite database.
+#
+# For PostgreSQL (production):
+#   Credentials are stored in AWS Secrets Manager (secret: ORCD_DBA).
+#   Get RDS endpoint: tofu output -raw rds_address
+#   Get credentials: aws secretsmanager get-secret-value --secret-id ORCD_DBA
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': '/srv/coldfront/coldfront.db',
+if os.environ.get('DB_ENGINE', 'sqlite').lower() == 'postgres':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('DB_NAME', 'rentals'),
+            'USER': os.environ.get('DB_USER', ''),
+            'PASSWORD': os.environ.get('DB_PASSWORD', ''),
+            'HOST': os.environ.get('DB_HOST', ''),
+            'PORT': os.environ.get('DB_PORT', '5432'),
+        }
     }
-}
-
-# For PostgreSQL (optional, recommended for production):
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': 'coldfront',
-#         'USER': '{{DB_USER}}',
-#         'PASSWORD': '{{DB_PASSWORD}}',
-#         'HOST': 'localhost',
-#         'PORT': '5432',
-#     }
-# }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': '/srv/coldfront/coldfront.db',
+        }
+    }
 
 # =============================================================================
 # STATIC FILES
