@@ -262,6 +262,11 @@ run_ansible() {
         extra_vars="${extra_vars} skip_ssl=true"
     fi
     
+    if [[ "${CERTBOT_STAGING}" == "true" ]]; then
+        extra_vars="${extra_vars} certbot_staging=true"
+        log_warn "Using Let's Encrypt STAGING certificates (not trusted by browsers)"
+    fi
+    
     if [[ "${DRY_RUN}" == "true" ]]; then
         log_info "DRY RUN - would execute:"
         echo "  ansible-playbook ${ANSIBLE_DIR}/nginx-base.yml \\"
@@ -371,6 +376,7 @@ main() {
     CERTBOT_EMAIL=""
     SKIP_SSL="false"
     DRY_RUN="false"
+    CERTBOT_STAGING="false"
     
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -384,6 +390,10 @@ main() {
                 ;;
             --skip-ssl)
                 SKIP_SSL="true"
+                shift
+                ;;
+            --staging)
+                CERTBOT_STAGING="true"
                 shift
                 ;;
             --dry-run)

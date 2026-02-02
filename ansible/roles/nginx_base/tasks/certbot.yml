@@ -18,9 +18,15 @@
     --no-eff-email
     --non-interactive
     --redirect
+    {{ '--staging' if certbot_staging | default(false) | bool else '' }}
   when: not cert_exists.stat.exists
   register: certbot_result
   notify: Reload nginx
+
+- name: Display staging certificate warning
+  ansible.builtin.debug:
+    msg: "WARNING: Using Let's Encrypt STAGING certificate - not trusted by browsers!"
+  when: certbot_staging | default(false) | bool
 
 - name: Display certbot result
   ansible.builtin.debug:

@@ -173,9 +173,11 @@ else
     log_section "Phase 1: Prerequisites"
     SKIP_NGINX_ARG=""
     SKIP_F2B_ARG=""
+    STAGING_ARG=""
     [[ "${CFG_skip_nginx}" == "true" ]] && SKIP_NGINX_ARG="--skip-nginx"
     [[ "${CFG_skip_f2b}" == "true" ]]   && SKIP_F2B_ARG="--skip-f2b"
-    "${SCRIPT_DIR}/install_prereqs.sh" --domain "$DOMAIN" --email "$EMAIL" $SKIP_NGINX_ARG $SKIP_F2B_ARG
+    [[ "${CFG_certbot_staging}" == "true" ]] && STAGING_ARG="--staging"
+    "${SCRIPT_DIR}/install_prereqs.sh" --domain "$DOMAIN" --email "$EMAIL" $SKIP_NGINX_ARG $SKIP_F2B_ARG $STAGING_ARG
 fi
 fi
 

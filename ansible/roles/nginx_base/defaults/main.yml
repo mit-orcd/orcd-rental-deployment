@@ -8,6 +8,10 @@ domain_name: ""
 certbot_email: ""
 skip_ssl: false
 
+# Use Let's Encrypt staging server for test certificates (default: false = production)
+# Staging certs are not trusted by browsers but have much higher rate limits
+certbot_staging: false
+
 # Paths
 placeholder_root: /var/www/placeholder
 certbot_webroot: /var/www/certbot

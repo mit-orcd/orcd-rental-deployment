@@ -72,6 +72,14 @@ superuser:
 #   port: "5432"
 
 # -----------------------------------------------------------------------------
+# Optional: SSL Certificate Configuration
+# -----------------------------------------------------------------------------
+# certbot_staging: false  # Use Let's Encrypt staging (test) certificates
+                          # Staging certs are NOT trusted by browsers but have
+                          # much higher rate limits - useful for testing deploys.
+                          # Default: false (production certificates)
+
+# -----------------------------------------------------------------------------
 # Optional: Skip phases (for container / re-run when infra already exists)
 # -----------------------------------------------------------------------------
 # skip_nginx: false   # Skip install_prereqs nginx/SSL step

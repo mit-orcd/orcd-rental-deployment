@@ -136,8 +136,14 @@ install_nginx_base() {
         exit 1
     fi
     
+    # Build command with optional staging flag
+    local nginx_cmd="${SCRIPT_DIR}/install_nginx_base.sh --domain ${DOMAIN_NAME} --email ${CERTBOT_EMAIL}"
+    if [[ "${CERTBOT_STAGING}" == "true" ]]; then
+        nginx_cmd="${nginx_cmd} --staging"
+    fi
+    
     # Run nginx base installation
-    "${SCRIPT_DIR}/install_nginx_base.sh" --domain "${DOMAIN_NAME}" --email "${CERTBOT_EMAIL}"
+    ${nginx_cmd}
     
     log_info "Nginx base installation complete"
 }
@@ -243,6 +249,7 @@ main() {
     CERTBOT_EMAIL=""
     SKIP_NGINX=false
     SKIP_F2B=false
+    CERTBOT_STAGING=false
     
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -260,6 +267,10 @@ main() {
                 ;;
             --skip-f2b)
                 SKIP_F2B=true
+                shift
+                ;;
+            --staging)
+                CERTBOT_STAGING=true
                 shift
                 ;;
             --help)
