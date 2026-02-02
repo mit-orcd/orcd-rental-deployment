@@ -39,6 +39,11 @@
   register: cert_check
   failed_when: not cert_check.stat.exists
 
+- name: Check if app config already exists (has its own catch-alls)
+  ansible.builtin.stat:
+    path: "{{ nginx_conf_dir }}/coldfront-app.conf"
+  register: app_conf_exists
+
 - name: Deploy HTTPS catch-all for unknown domains
   ansible.builtin.template:
     src: nginx-catchall-https.conf.j2
@@ -47,6 +52,7 @@
     group: root
     mode: '0644'
   notify: Reload nginx
+  when: not app_conf_exists.stat.exists
 
 - name: Validate nginx configuration with HTTPS catch-all
   ansible.builtin.command: nginx -t
