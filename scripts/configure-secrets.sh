@@ -333,6 +333,7 @@ generate_local_settings() {
     
     # Try to copy to app directory (may need sudo)
     if cp "${SECRETS_COPY}" "${OUTPUT}" 2>/dev/null; then
+        chown "${SERVICE_USER}:${SERVICE_USER}" "${OUTPUT}" 2>/dev/null || sudo chown "${SERVICE_USER}:${SERVICE_USER}" "${OUTPUT}"
         chmod 600 "${OUTPUT}"
         log_info "Created: ${OUTPUT}"
     else
@@ -392,6 +393,7 @@ generate_coldfront_env() {
     
     # Try to copy to app directory (may need sudo)
     if cp "${SECRETS_COPY}" "${OUTPUT}" 2>/dev/null; then
+        chown "${SERVICE_USER}:${SERVICE_USER}" "${OUTPUT}" 2>/dev/null || sudo chown "${SERVICE_USER}:${SERVICE_USER}" "${OUTPUT}"
         chmod 600 "${OUTPUT}"
         log_info "Created: ${OUTPUT}"
     else
